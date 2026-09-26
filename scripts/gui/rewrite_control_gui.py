@@ -369,8 +369,8 @@ RUN_ARGUMENTS = [
 
 
 def find_repo_root(script_dir: Path) -> Path:
-    candidate = script_dir.parent
-    if (candidate / "deploy_rewrite.ps1").is_file():
+    candidate = script_dir.parent.parent
+    if (candidate / "scripts" / "deploy" / "deploy_rewrite.ps1").is_file():
         return candidate
     return script_dir
 
@@ -389,20 +389,9 @@ class RewriteControlGui:
         self.root = root
         self.script_dir = Path(__file__).resolve().parent
         self.repo_root = find_repo_root(self.script_dir)
-        self.deploy_script = self.repo_root / "deploy_rewrite.ps1"
-        self.run_script = (
-            self.script_dir / "run_rewrite_track.ps1"
-            if (self.script_dir / "run_rewrite_track.ps1").is_file()
-            else self.repo_root / "tools" / "run_rewrite_track.ps1"
-        )
-        self.plot_script = (
-            self.script_dir / "plot_rewrite_trajectory.py"
-            if (self.script_dir / "plot_rewrite_trajectory.py").is_file()
-            else self.repo_root
-            / "SmartCar"
-            / "tools"
-            / "plot_rewrite_trajectory.py"
-        )
+        self.deploy_script = self.repo_root / "scripts" / "deploy" / "deploy_rewrite.ps1"
+        self.run_script = self.repo_root / "scripts" / "run" / "run_rewrite_track.ps1"
+        self.plot_script = self.repo_root / "scripts" / "telemetry" / "plot_rewrite_trajectory.py"
         self.output_dir = self.repo_root / "build" / "trajectory"
         self.settings_path = (
             self.repo_root / "build" / "rewrite_gui_settings.json"
@@ -607,7 +596,7 @@ class RewriteControlGui:
                 ("side_road", "启用环岛/侧路"),
                 ("tof_slope", "启用 TOF 坡道检测"),
                 ("imu_enabled", "启用 IMU（关闭后使用编码器降级）"),
-                ("swap_motors", "交换左右电机输出（success-new2 默认）"),
+                ("swap_motors", "交换左右电机输出（当前控制器默认）"),
                 ("swap_encoders", "交换左右编码器反馈"),
                 ("imu_accel_swap_xy", "交换 IMU 前向/右向加速度轴"),
                 ("imu_stationary_zero", "启用 IMU 静止速度归零（ZUPT）"),
@@ -1031,7 +1020,7 @@ class RewriteControlGui:
                     values["swap_motors"] = DEFAULTS["swap_motors"]
                     values["swap_encoders"] = DEFAULTS["swap_encoders"]
                     self._append_log(
-                        "[设置] 已按 success-new2 启用左右电机交换；编码器保持原通道"
+                        "[设置] 已启用左右电机交换；编码器保持原通道"
                     )
                 if saved_version < 9:
                     values["disable_line_lost_stop"] = DEFAULTS[

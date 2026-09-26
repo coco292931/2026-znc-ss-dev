@@ -161,7 +161,7 @@ void PathParams::print_help(const char* exe) const {
         "  --swap-encoders         Exchange encoder feedback only\n"
         "  --no-swap-encoders      Keep raw encoder channels (default)\n"
         "  --allow-reverse         Permit reverse inner wheel targets\n"
-        "  --calibration <file>    Row-to-distance table, default rewrite/标定数据.txt\n"
+        "  --calibration <file>    Row-to-distance table, default config/标定数据.txt\n"
         "  --control-distance <cm> Main lookahead distance, default 60cm\n"
         "  --far-distance <cm>     Far preview distance, default 120cm\n"
         "  --threshold-floor <N>   Minimum road-score threshold, default 70\n"

@@ -1,8 +1,9 @@
 # rewrite path follow
 
-`rewrite/` is an independent path-following program built around the existing
-94x60 longest-white-column vision pipeline. It does not reuse the
-`success-new2` navigation or steering state machine.
+This is an independent path-following program built around the existing 94x60
+longest-white-column vision pipeline. Source files are organized by function
+under `src/`, with build, deployment, board, GUI, and telemetry tools under
+`scripts/`.
 
 ## Control flow
 
@@ -75,7 +76,7 @@ the default. Side-road and target actions are opt-in:
 ./lq_path_follow_rewrite --http 8080 --target-actions --dry-run
 ```
 
-The target classifier in `target/model` uses a 32x32 RGB input. The class
+The target classifier in `models/target` uses a 32x32 RGB input. The class
 groups are 0-1 weapon/left bypass, 2-3 supply/right bypass, and 4-5
 vehicle/straight over. Use `--target-input-size 32` when overriding defaults.
 The reference-video red-area trigger is `--target-close-size 0.04`; target
@@ -162,8 +163,8 @@ the control loop. Overrides: `--display-spi`, `--display-spi-speed`,
 - `http_streamer.*`: MJPEG `/stream`, JSON `/stats`, and 20 Hz NDJSON
   `/telemetry`. Telemetry clients do not cause frame cloning.
 
-For layered motor-stutter diagnosis, build the `motor-test` target and follow
-[`tools/MOTOR_STUTTER_TEST.md`](../tools/MOTOR_STUTTER_TEST.md). The test compares
+For layered motor-stutter diagnosis, build the `motor-test` target. The test in
+`src/app/motor_stutter_test.cpp` compares
 one-shot PWM, repeated PWM, and the current synchronous closed-loop path while
 recording per-cycle timing, encoder capture values, RPM, and PWM commands.
 
@@ -240,14 +241,14 @@ nearest configured grid heading.
 Host regression test is optional and independent from deployment:
 
 ```bash
-./rewrite/build_rewrite.sh selftest
+./scripts/build/build_rewrite.sh selftest
 ```
 
 Build the LoongArch ST7735S hardware-SPI example:
 
 ```bash
 CXX=/path/to/loongarch64-linux-gnu-g++ \
-  ./rewrite/build_rewrite.sh display-example
+  ./scripts/build/build_rewrite.sh display-example
 ```
 
 The shared bus wiring is SPI1 MOSI GPIO62, SPI1 MISO GPIO61, SPI1 CLK GPIO60,
@@ -275,16 +276,16 @@ After each board reboot, configure the SPI1 pinmux and bind the device-tree
 Offline video replay writes per-frame recognition and state events:
 
 ```bash
-./rewrite/build_rewrite.sh replay
+./scripts/build/build_rewrite.sh replay
 ./build/rewrite/rewrite_video_replay input.mov events.csv
 ```
 
-Canonical Windows deployment keeps `success-new2` untouched:
+Canonical Windows deployment uses the reorganized tree:
 
 ```powershell
-.\deploy_rewrite.ps1
-.\deploy_rewrite.ps1 -RunMode Dry
-.\deploy_rewrite.ps1 -RunMode Motors -ConfirmWheelsLifted
+.\scripts\deploy\deploy_rewrite.ps1
+.\scripts\deploy\deploy_rewrite.ps1 -RunMode Dry
+.\scripts\deploy\deploy_rewrite.ps1 -RunMode Motors -ConfirmWheelsLifted
 ```
 
 The deployment uses the fixed WSL Ubuntu environment and old-world LoongArch
@@ -297,10 +298,10 @@ and model files are skipped by SHA-256, while SSH connection multiplexing
 avoids repeated handshakes. Useful overrides:
 
 ```powershell
-.\deploy_rewrite.ps1 -Jobs 6
-.\deploy_rewrite.ps1 -BuildOnly
-.\deploy_rewrite.ps1 -ForceRebuild
-.\deploy_rewrite.ps1 -BoardIP 192.168.43.220 -SkipModels
+.\scripts\deploy\deploy_rewrite.ps1 -Jobs 6
+.\scripts\deploy\deploy_rewrite.ps1 -BuildOnly
+.\scripts\deploy\deploy_rewrite.ps1 -ForceRebuild
+.\scripts\deploy\deploy_rewrite.ps1 -BoardIP 192.168.43.220 -SkipModels
 ```
 
 ## Telemetry and trajectory
@@ -308,9 +309,9 @@ avoids repeated handshakes. Useful overrides:
 Start a board run and automatically record, stop, and plot its trajectory:
 
 ```powershell
-.\tools\run_rewrite_track.ps1
-.\tools\run_rewrite_track.ps1 -DryRun
-.\tools\run_rewrite_track.ps1 -TargetPathDir /home/root -DryRun
+.\scripts\run\run_rewrite_track.ps1
+.\scripts\run\run_rewrite_track.ps1 -DryRun
+.\scripts\run\run_rewrite_track.ps1 -TargetPathDir /home/root -DryRun
 ```
 
 The track runner uses the independently deployed
@@ -328,19 +329,14 @@ The runner auto-detects Python with matplotlib (override it with
 the current pose. Disable it with `-NoTelemetryEcho` or change the rate with
 `-TelemetryEchoInterval 0.25`.
 
-To inspect an already-running board without starting or stopping it, use the
-standalone local debugger:
-
-```powershell
-.\tools\debug_rewrite_local.ps1
-.\tools\debug_rewrite_local.ps1 -DurationSeconds 10
-```
+To inspect an already-running board without starting or stopping it, use
+`scripts/telemetry/debug_rewrite_telemetry.py`.
 
 This entry auto-detects Python and uses the regular Windows OpenSSH client for
 the optional board-process probe. Pass `-SkipSshProbe` when only HTTP telemetry
 is needed.
 
-For normal use, double-click `tools\start_rewrite_gui.bat`. The GUI saves
+For normal use, double-click `scripts\gui\start_rewrite_gui.bat`. The GUI saves
 connection, speed-loop, visual-yaw, and ramp settings under
 `build/rewrite_gui_settings.json`. It provides build/upload, live start,
 safe stop, emergency SSH stop, CSV selection, and in-window trajectory and
@@ -445,25 +441,16 @@ plotter independently scans valid range samples in both directions and writes
 maximum increase/decrease, and a concrete sensor-init status when no valid
 distance was recorded.
 
-Create a self-contained ZIP containing the launcher, recorder, and plotter:
-
-```powershell
-.\tools\package_rewrite_track.ps1
-```
-
-The package is written to `build/packages/rewrite_track_tools.zip`. The
-extracted launcher automatically uses the Python tools beside it.
-
 Record the board-fused trajectory:
 
 ```bash
-python SmartCar/tools/record_rewrite_trajectory.py
+python scripts/telemetry/record_rewrite_trajectory.py
 ```
 
 Render an equal-scale XY plot and summary after the run:
 
 ```bash
-python SmartCar/tools/plot_rewrite_trajectory.py build/trajectory/rewrite_*.csv
+python scripts/telemetry/plot_rewrite_trajectory.py build/trajectory/rewrite_*.csv
 ```
 
 The Python tools never open the IMU. Position comes from encoder travel plus
@@ -475,7 +462,7 @@ Record a compact path while the normal visual follower (or another manual
 control process that publishes rewrite telemetry) drives the course:
 
 ```bash
-python SmartCar/tools/record_inertial_path.py \
+python scripts/telemetry/record_inertial_path.py \
   --url http://192.168.43.220:8080/telemetry \
   --output build/paths/course.csv
 ```
@@ -501,7 +488,7 @@ calibration`, then start rewrite with high-rate telemetry:
 After `[IMU] ready` appears, manually move the vehicle while recording:
 
 ```bash
-python SmartCar/tools/record_imu_path.py \
+python scripts/telemetry/record_imu_path.py \
   --url http://192.168.43.220:8080/telemetry \
   --output build/paths/imu_course.csv
 ```
@@ -546,7 +533,7 @@ before replay. Encoder-fused `record_inertial_path.py` remains the accurate
 choice for longer routes.
 
 ```bash
-python SmartCar/tools/record_inertial_path.py \
+python scripts/telemetry/record_inertial_path.py \
   --input build/trajectory/rewrite_20260719_120000.csv \
   --output build/paths/course.csv
 ```

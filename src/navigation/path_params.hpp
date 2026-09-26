@@ -223,7 +223,7 @@ struct PathParams {
     int vision_blue_saturation_min = 35;
     int vision_blue_value_min = 55;
     int vision_blue_penalty = 80;
-    std::string calibration_path = "rewrite/标定数据.txt";
+    std::string calibration_path = "config/标定数据.txt";
     int calibration_image_height = 240;
     int horizon_row = -1;             // >=0 overrides calibration horizon.
     double horizon_image_row = -1.0;  // >=0 overrides loaded image-row horizon.

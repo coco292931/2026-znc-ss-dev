@@ -2,7 +2,17 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
+REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
+SRC_ROOT="${REPO_ROOT}/src"
+NAV_SRC="${SRC_ROOT}/navigation"
+VISION_SRC="${SRC_ROOT}/vision"
+MOTION_SRC="${SRC_ROOT}/motion"
+IMU_SRC="${SRC_ROOT}/sensors/imu"
+TOF_SRC="${SRC_ROOT}/sensors/tof"
+TELEMETRY_SRC="${SRC_ROOT}/telemetry"
+DISPLAY_SRC="${SRC_ROOT}/display"
+PLATFORM_SRC="${SRC_ROOT}/platform"
+DRIVER_SRC="${SRC_ROOT}/drivers/loongson"
 BUILD_DIR="${REPO_ROOT}/build/rewrite"
 mkdir -p "${BUILD_DIR}"
 
@@ -10,65 +20,67 @@ MODE="${1:-selftest}"
 CXX="${CXX:-g++}"
 BUILD_JOBS="${BUILD_JOBS:-4}"
 FORCE_REBUILD="${FORCE_REBUILD:-0}"
-COMMON=(-std=c++17 -O2 -Wall -Wextra -I"${SCRIPT_DIR}")
+COMMON=(-std=c++17 -O2 -Wall -Wextra
+  -I"${SRC_ROOT}/app" -I"${VISION_SRC}" -I"${NAV_SRC}"
+  -I"${MOTION_SRC}" -I"${IMU_SRC}" -I"${TOF_SRC}"
+  -I"${TELEMETRY_SRC}" -I"${DISPLAY_SRC}" -I"${PLATFORM_SRC}"
+  -I"${PLATFORM_SRC}/safety" -I"${DRIVER_SRC}/inc")
 
 CORE_SRC=(
-  "${SCRIPT_DIR}/path_params.cpp"
-  "${SCRIPT_DIR}/vision_pipeline.cpp"
-  "${SCRIPT_DIR}/path_controller.cpp"
-  "${SCRIPT_DIR}/motion_control.cpp"
-  "${SCRIPT_DIR}/motor_adapter.cpp"
-  "${SCRIPT_DIR}/imu_feedback.cpp"
-  "${SCRIPT_DIR}/inertial_navigation.cpp"
-  "${SCRIPT_DIR}/tof_slope_sensor.cpp"
-  "${SCRIPT_DIR}/odometry.cpp"
-  "${SCRIPT_DIR}/http_streamer.cpp"
-  "${SCRIPT_DIR}/target_recognizer.cpp"
+  "${NAV_SRC}/path_params.cpp"
+  "${VISION_SRC}/vision_pipeline.cpp"
+  "${NAV_SRC}/path_controller.cpp"
+  "${MOTION_SRC}/motion_control.cpp"
+  "${MOTION_SRC}/motor_adapter.cpp"
+  "${IMU_SRC}/imu_feedback.cpp"
+  "${NAV_SRC}/inertial_navigation.cpp"
+  "${TOF_SRC}/tof_slope_sensor.cpp"
+  "${NAV_SRC}/odometry.cpp"
+  "${TELEMETRY_SRC}/http_streamer.cpp"
+  "${VISION_SRC}/target_recognizer.cpp"
 )
 
 if [[ "${MODE}" == "selftest" ]]; then
   OUT="${BUILD_DIR}/rewrite_path_selftest"
   "${CXX}" "${COMMON[@]}" -DPATH_FOLLOW_NO_OPENCV -DPATH_FOLLOW_NO_HW \
-    "${SCRIPT_DIR}/path_selftest.cpp" "${CORE_SRC[@]}" -pthread -o "${OUT}"
+    "${SRC_ROOT}/app/path_selftest.cpp" "${CORE_SRC[@]}" -pthread -o "${OUT}"
   "${OUT}"
   exit 0
 fi
 
 if [[ "${MODE}" == "display-example" ]]; then
-  LQ_DEMO="${LQ_DEMO:-${REPO_ROOT}/Loongson_2k301_LIB-master/Loongson_2k301_LIB-master/LQ_ls2k301_Demo}"
   OUT="${BUILD_DIR}/rewrite_st7735s_example"
-  "${CXX}" "${COMMON[@]}" -I"${LQ_DEMO}/Libraries/Driver/inc" \
-    "${SCRIPT_DIR}/st7735s_example.cpp" \
-    "${SCRIPT_DIR}/st7735s.cpp" \
-    "${SCRIPT_DIR}/spi1_shared.cpp" \
-    "${LQ_DEMO}/Libraries/Driver/LQ_HW_GPIO.cpp" \
-    "${LQ_DEMO}/Libraries/Driver/LQ_MAP_ADDR.cpp" \
+  "${CXX}" "${COMMON[@]}" \
+    "${SRC_ROOT}/app/st7735s_example.cpp" \
+    "${DISPLAY_SRC}/st7735s.cpp" \
+    "${DISPLAY_SRC}/spi1_shared.cpp" \
+    "${DRIVER_SRC}/LQ_HW_GPIO.cpp" \
+    "${DRIVER_SRC}/LQ_MAP_ADDR.cpp" \
     -pthread -o "${OUT}"
   echo "built ${OUT}"
   exit 0
 fi
 
 if [[ "${MODE}" == "motor-test" || "${MODE}" == "motor-test-sim" ]]; then
-  LQ_DEMO="${LQ_DEMO:-${REPO_ROOT}/Loongson_2k301_LIB-master/Loongson_2k301_LIB-master/LQ_ls2k301_Demo}"
-  SMARTCAR_SRC="${REPO_ROOT}/SmartCar/src"
+  SMARTCAR_SRC="${PLATFORM_SRC}"
   OUT="${BUILD_DIR}/rewrite_motor_stutter_test"
   DEFINES=(-DMOTOR_TEST_VARIANT=\"rewrite\")
-  INCLUDES=(-I"${SCRIPT_DIR}" -I"${SMARTCAR_SRC}")
+  INCLUDES=(-I"${SMARTCAR_SRC}")
   SOURCES=(
-    "${REPO_ROOT}/tools/motor_stutter_test.cpp"
-    "${SCRIPT_DIR}/path_params.cpp"
-    "${SCRIPT_DIR}/motion_control.cpp"
-    "${SCRIPT_DIR}/motor_adapter.cpp"
+    "${SRC_ROOT}/app/motor_stutter_test.cpp"
+    "${NAV_SRC}/path_params.cpp"
+    "${MOTION_SRC}/motion_control.cpp"
+    "${MOTION_SRC}/motor_adapter.cpp"
     "${SMARTCAR_SRC}/hal.cpp"
     "${SMARTCAR_SRC}/success_motor.cpp"
   )
   if [[ "${MODE}" == "motor-test-sim" ]]; then
     DEFINES+=(-DSMARTCAR_SIM)
   else
-    INCLUDES+=(-I"${LQ_DEMO}/Libraries/Driver/inc")
+    INCLUDES+=(-I"${DRIVER_SRC}/inc")
     SOURCES+=(
-      "${LQ_DEMO}/Libraries/Driver/LQ_HW_GPIO.cpp"
-      "${LQ_DEMO}/Libraries/Driver/LQ_MAP_ADDR.cpp"
+      "${DRIVER_SRC}/LQ_HW_GPIO.cpp"
+      "${DRIVER_SRC}/LQ_MAP_ADDR.cpp"
     )
   fi
   "${CXX}" "${COMMON[@]}" "${DEFINES[@]}" "${INCLUDES[@]}" \
@@ -80,12 +92,14 @@ fi
 if [[ "${MODE}" == "target" ]]; then
   OPENCV_DIR="${OPENCV_DIR:-}"
   NCNN_DIR="${NCNN_DIR:-}"
-  LQ_DEMO="${LQ_DEMO:-${REPO_ROOT}/Loongson_2k301_LIB-master/Loongson_2k301_LIB-master/LQ_ls2k301_Demo}"
-  SMARTCAR_SRC="${REPO_ROOT}/SmartCar/src"
-  SUCCESS_NEW2="${REPO_ROOT}/success-new2"
+  SMARTCAR_SRC="${PLATFORM_SRC}"
+  SENSOR_SRC="${SRC_ROOT}/sensors"
   OUT="${BUILD_DIR}/lq_path_follow_rewrite"
   OBJ_DIR="${BUILD_DIR}/obj-target"
-  INCLUDES=(-I"${SCRIPT_DIR}" -I"${SMARTCAR_SRC}" -I"${SUCCESS_NEW2}" -I"${LQ_DEMO}/Libraries/Driver/inc")
+  INCLUDES=(-I"${SRC_ROOT}/app" -I"${VISION_SRC}" -I"${NAV_SRC}"
+    -I"${MOTION_SRC}" -I"${IMU_SRC}" -I"${TOF_SRC}"
+    -I"${TELEMETRY_SRC}" -I"${DISPLAY_SRC}" -I"${SMARTCAR_SRC}"
+    -I"${SMARTCAR_SRC}/safety" -I"${DRIVER_SRC}/inc")
   LIBS=(-fopenmp -lgomp -pthread -ldl -lm)
   DEFINES=()
   if [[ -n "${OPENCV_DIR}" ]]; then
@@ -106,20 +120,20 @@ if [[ "${MODE}" == "target" ]]; then
     LIBS+=(-L"${NCNN_DIR}/lib" -lncnn)
   fi
   TARGET_SRC=(
-    "${SCRIPT_DIR}/lq_path_follow.cpp"
-    "${SCRIPT_DIR}/status_display.cpp"
-    "${SCRIPT_DIR}/st7735s.cpp"
-    "${SCRIPT_DIR}/spi1_shared.cpp"
-    "${SCRIPT_DIR}/lsm6dsr_spi1.cpp"
+    "${SRC_ROOT}/app/lq_path_follow.cpp"
+    "${TELEMETRY_SRC}/status_display.cpp"
+    "${DISPLAY_SRC}/st7735s.cpp"
+    "${DISPLAY_SRC}/spi1_shared.cpp"
+    "${IMU_SRC}/lsm6dsr_spi1.cpp"
     "${CORE_SRC[@]}"
-    "${SUCCESS_NEW2}/lq_lsm6dsr.cpp"
-    "${SUCCESS_NEW2}/lq_vl53l0x.cpp"
+    "${IMU_SRC}/lq_lsm6dsr.cpp"
+    "${TOF_SRC}/lq_vl53l0x.cpp"
     "${SMARTCAR_SRC}/hal.cpp"
     "${SMARTCAR_SRC}/success_motor.cpp"
-    "${LQ_DEMO}/Libraries/Driver/LQ_ATIM_PWM.cpp"
-    "${LQ_DEMO}/Libraries/Driver/LQ_HW_ADC.cpp"
-    "${LQ_DEMO}/Libraries/Driver/LQ_HW_GPIO.cpp"
-    "${LQ_DEMO}/Libraries/Driver/LQ_MAP_ADDR.cpp"
+    "${DRIVER_SRC}/LQ_ATIM_PWM.cpp"
+    "${DRIVER_SRC}/LQ_HW_ADC.cpp"
+    "${DRIVER_SRC}/LQ_HW_GPIO.cpp"
+    "${DRIVER_SRC}/LQ_MAP_ADDR.cpp"
   )
   mkdir -p "${OBJ_DIR}"
   BUILD_JOBS="$((BUILD_JOBS < 1 ? 1 : BUILD_JOBS))"
@@ -139,7 +153,7 @@ if [[ "${MODE}" == "target" ]]; then
     printf '%s\n' "${FLAG_HASH}" > "${FLAG_FILE}"
   fi
 
-  HEADER_DIRS=("${SCRIPT_DIR}" "${SMARTCAR_SRC}" "${SUCCESS_NEW2}" "${LQ_DEMO}/Libraries/Driver/inc")
+  HEADER_DIRS=("${SRC_ROOT}" "${SMARTCAR_SRC}" "${DRIVER_SRC}/inc")
   OBJECTS=()
   PIDS=()
   DESCRIPTIONS=()
@@ -207,7 +221,10 @@ fi
 
 if [[ "${MODE}" == "replay" ]]; then
   OPENCV_DIR="${OPENCV_DIR:-}"
-  INCLUDES=(-I"${SCRIPT_DIR}")
+  INCLUDES=(-I"${SRC_ROOT}/app" -I"${VISION_SRC}" -I"${NAV_SRC}"
+    -I"${MOTION_SRC}" -I"${IMU_SRC}" -I"${TOF_SRC}"
+    -I"${TELEMETRY_SRC}" -I"${DISPLAY_SRC}" -I"${SMARTCAR_SRC}"
+    -I"${SMARTCAR_SRC}/safety" -I"${DRIVER_SRC}/inc")
   LIBS=(-pthread)
   if [[ -n "${OPENCV_DIR}" ]]; then
     INCLUDES+=(-I"${OPENCV_DIR}/include/opencv4")
@@ -227,10 +244,10 @@ if [[ "${MODE}" == "replay" ]]; then
   fi
   OUT="${BUILD_DIR}/rewrite_video_replay"
   "${CXX}" "${COMMON[@]}" "${INCLUDES[@]}" \
-    "${SCRIPT_DIR}/video_replay.cpp" \
-    "${SCRIPT_DIR}/path_params.cpp" \
-    "${SCRIPT_DIR}/vision_pipeline.cpp" \
-    "${SCRIPT_DIR}/path_controller.cpp" \
+    "${SRC_ROOT}/app/video_replay.cpp" \
+    "${NAV_SRC}/path_params.cpp" \
+    "${VISION_SRC}/vision_pipeline.cpp" \
+    "${NAV_SRC}/path_controller.cpp" \
     "${LIBS[@]}" -o "${OUT}"
   echo "built ${OUT}"
   exit 0

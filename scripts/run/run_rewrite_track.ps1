@@ -4,9 +4,9 @@
 Start rewrite on the board, record telemetry automatically, and plot the run.
 
 .EXAMPLE
-.\tools\run_rewrite_track.ps1
-.\tools\run_rewrite_track.ps1 -DryRun
-.\tools\run_rewrite_track.ps1 -TargetPathDir /home/root -DryRun
+.\scripts\run\run_rewrite_track.ps1
+.\scripts\run\run_rewrite_track.ps1 -DryRun
+.\scripts\run\run_rewrite_track.ps1 -TargetPathDir /home/root -DryRun
 #>
 [CmdletBinding()]
 param(
@@ -296,9 +296,10 @@ if ($UseInertialFallback) {
         $UseInertialFallback = $false
     }
 }
-$BundledRecorder = Join-Path $PSScriptRoot "record_rewrite_trajectory.py"
-$BundledPlotter = Join-Path $PSScriptRoot "plot_rewrite_trajectory.py"
-$BundledDebugger = Join-Path $PSScriptRoot "debug_rewrite_telemetry.py"
+$TelemetryRoot = Join-Path $RepositoryRoot "scripts\telemetry"
+$BundledRecorder = Join-Path $TelemetryRoot "record_rewrite_trajectory.py"
+$BundledPlotter = Join-Path $TelemetryRoot "plot_rewrite_trajectory.py"
+$BundledDebugger = Join-Path $TelemetryRoot "debug_rewrite_telemetry.py"
 $IsBundled = (
     (Test-Path -LiteralPath $BundledRecorder -PathType Leaf) -and
     (Test-Path -LiteralPath $BundledPlotter -PathType Leaf) -and
@@ -310,16 +311,7 @@ if ($IsBundled) {
     $Plotter = $BundledPlotter
     $Debugger = $BundledDebugger
 } else {
-    $WorkRoot = $RepositoryRoot
-    $Recorder = Join-Path $RepositoryRoot (
-        "SmartCar\tools\record_rewrite_trajectory.py"
-    )
-    $Plotter = Join-Path $RepositoryRoot (
-        "SmartCar\tools\plot_rewrite_trajectory.py"
-    )
-    $Debugger = Join-Path $RepositoryRoot (
-        "tools\debug_rewrite_telemetry.py"
-    )
+    throw "Missing bundled telemetry tools under $TelemetryRoot"
 }
 $OutputDirectory = Join-Path $WorkRoot "build\trajectory"
 $PythonCandidates = [System.Collections.Generic.List[string]]::new()

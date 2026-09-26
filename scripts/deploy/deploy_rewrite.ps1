@@ -2,14 +2,14 @@
 #!/usr/bin/env pwsh
 <#
 .SYNOPSIS
-Build and independently deploy rewrite/lq_path_follow.
+Build and independently deploy the reorganized lq_path_follow program.
 
 .EXAMPLE
-.\deploy_rewrite.ps1
-.\deploy_rewrite.ps1 -RunMode Dry
-.\deploy_rewrite.ps1 -RunMode Motors -ConfirmWheelsLifted
-.\deploy_rewrite.ps1 -BuildOnly -Jobs 6
-.\deploy_rewrite.ps1 -ForceRebuild
+.\scripts\deploy\deploy_rewrite.ps1
+.\scripts\deploy\deploy_rewrite.ps1 -RunMode Dry
+.\scripts\deploy\deploy_rewrite.ps1 -RunMode Motors -ConfirmWheelsLifted
+.\scripts\deploy\deploy_rewrite.ps1 -BuildOnly -Jobs 6
+.\scripts\deploy\deploy_rewrite.ps1 -ForceRebuild
 #>
 [CmdletBinding()]
 param(
@@ -43,8 +43,8 @@ $env:LANG = "C.UTF-8"
 $env:LC_ALL = "C.UTF-8"
 $env:WSL_UTF8 = "1"
 
-$RepoRoot = Split-Path -Parent $PSCommandPath
-$Backend = Join-Path $RepoRoot "rewrite\deploy_rewrite.sh"
+$RepoRoot = Split-Path -Parent (Split-Path -Parent $PSCommandPath)
+$Backend = Join-Path $RepoRoot "scripts\deploy\deploy_rewrite.sh"
 
 if ($RunMode -eq "Motors" -and -not $ConfirmWheelsLifted) {
     throw "Motor mode refused. Lift the wheels, then pass -ConfirmWheelsLifted."
@@ -78,7 +78,7 @@ $WslArgs = @(
     "-d", $WslDistribution,
     "--cd", $WslRepo,
     "--", "env", "LQ_ENV_DIR=$WslEnvironmentRoot",
-    "bash", "./rewrite/deploy_rewrite.sh",
+    "bash", "./scripts/deploy/deploy_rewrite.sh",
     "--board-ip", $BoardIP,
     "--board-user", $BoardUser,
     "--run", $RunMode.ToLowerInvariant(),

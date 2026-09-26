@@ -60,7 +60,7 @@ if [[ "${RUN_MODE}" == "motors" &&
 fi
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
+REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 ENV_DIR="${LQ_ENV_DIR:-/mnt/c/Users/wyc18/Downloads/lq环境配置 (2)}"
 TC_NAME="loongson-gnu-toolchain-8.3-x86_64-loongarch64-linux-gnu-rc1.6"
 TC_DIR="${ENV_DIR}/${TC_NAME}"
@@ -68,8 +68,8 @@ TC_ARCHIVE="${ENV_DIR}/${TC_NAME}.tar.xz"
 DEP_ROOT="${ENV_DIR}/LQ_Dep_libs"
 OCV="${DEP_ROOT}/opencv_install"
 NCNN="${DEP_ROOT}/ncnn_install"
-LQ_DEMO="${REPO_ROOT}/Loongson_2k301_LIB-master/Loongson_2k301_LIB-master/LQ_ls2k301_Demo"
 OUT="${REPO_ROOT}/build/rewrite/lq_path_follow_rewrite"
+BUILD_SCRIPT="${REPO_ROOT}/scripts/build/build_rewrite.sh"
 REMOTE="${BOARD_USER}@${BOARD_IP}"
 REMOTE_PATH="/home/root/lq_path_follow_rewrite"
 REMOTE_UPLOAD="${REMOTE_PATH}.upload"
@@ -107,10 +107,9 @@ echo "==> Building rewrite with old-world GCC 8.3"
 CXX="${CXX}" \
 OPENCV_DIR="${OCV}" \
 NCNN_DIR="${NCNN}" \
-LQ_DEMO="${LQ_DEMO}" \
 BUILD_JOBS="${BUILD_JOBS}" \
 FORCE_REBUILD="${FORCE_REBUILD}" \
-bash "${SCRIPT_DIR}/build_rewrite.sh" target
+bash "${BUILD_SCRIPT}" target
 need_file "${OUT}"
 "${READELF}" -h "${OUT}" | grep -q LoongArch || {
     echo "Built artifact is not LoongArch." >&2
@@ -203,9 +202,9 @@ sync_asset() {
     echo "    updated ${destination}"
 }
 
-sync_asset "${SCRIPT_DIR}/标定数据.txt" "/home/root/rewrite/标定数据.txt"
-sync_asset "${SCRIPT_DIR}/setup_st7735s_spi.sh" "/home/root/setup_st7735s_spi.sh"
-sync_asset "${SCRIPT_DIR}/record_imu_path.sh" "/home/root/record_imu_path.sh"
+sync_asset "${REPO_ROOT}/config/标定数据.txt" "/home/root/rewrite/标定数据.txt"
+sync_asset "${REPO_ROOT}/scripts/board/setup_st7735s_spi.sh" "/home/root/setup_st7735s_spi.sh"
+sync_asset "${REPO_ROOT}/scripts/board/record_imu_path.sh" "/home/root/record_imu_path.sh"
 sync_asset "${OUT}" "/home/root/lq_path_follow_imu"
 ssh_board "chmod +x /home/root/setup_st7735s_spi.sh"
 ssh_board "chmod +x /home/root/record_imu_path.sh"
@@ -213,7 +212,7 @@ ssh_board "chmod +x /home/root/lq_path_follow_imu"
 
 if [[ "${SKIP_MODELS}" != "1" ]]; then
     for asset in best.ncnn.param best.ncnn.bin model_metadata.json; do
-        source="${REPO_ROOT}/target/model/${asset}"
+        source="${REPO_ROOT}/models/target/${asset}"
         sync_asset "${source}" "/home/root/models/${asset}"
     done
 fi

@@ -1,6 +1,6 @@
 @echo off
 setlocal
-cd /d "%~dp0.."
+cd /d "%~dp0..\.."
 if exist "D:\anaconda\pythonw.exe" (
     start "" "D:\anaconda\pythonw.exe" "%~dp0rewrite_control_gui.py" %*
     exit /b 0
