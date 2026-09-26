@@ -1,0 +1,37 @@
+{
+  "source": "C:\\Users\\wyc18\\zouma\\target\\model\\source-best.pt",
+  "source_sha256": "118e946ba8e1b30a3af03ba78bcf1329af82e647b8c888d53b6cc51d8d7a3195",
+  "ultralytics_version": "8.4.60",
+  "task": "classify",
+  "input_size": 32,
+  "input_blob": "in0",
+  "output_blob": "out0",
+  "pixel_format": "RGB",
+  "normalization": "pixel/255",
+  "classes": [
+    "A-枪支",
+    "B-爆炸物",
+    "C-急救包",
+    "D-望远镜",
+    "E-装甲车",
+    "F-救护车"
+  ],
+  "groups": {
+    "weapon_left": [
+      0,
+      1
+    ],
+    "supply_right": [
+      2,
+      3
+    ],
+    "vehicle_straight": [
+      4,
+      5
+    ]
+  },
+  "artifacts": {
+    "best.ncnn.param": "2e4dd7b88663b91c4ff22fcc62b59ac4d8bc3a03568c1fe5fb9dcead072c92f0",
+    "best.ncnn.bin": "95e5ba37b0f48ec540ec2a2c42ff478352b486ddb0f0bca6b55713be763b6edc"
+  }
+}
