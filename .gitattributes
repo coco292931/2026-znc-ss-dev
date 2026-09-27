@@ -1,0 +1,4 @@
+# 板端（Linux）执行的 shell 脚本必须保持 LF 行尾。
+# Windows checkout 若转成 CRLF，上传后 shebang 带 \r 会报
+# "bad interpreter: No such file or directory"。
+*.sh text eol=lf

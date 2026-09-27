@@ -221,11 +221,14 @@ fi
 
 if [[ "${MODE}" == "replay" ]]; then
   OPENCV_DIR="${OPENCV_DIR:-}"
+  # 修复：本分支从未给 SMARTCAR_SRC 赋值（set -u 下展开即挂），
+  # 且 LIBS 缺 -ldl -lm（OpenCV 需要 dlopen/dlsym@GLIBC_2.27）。与 .ps1 版对齐。
+  SMARTCAR_SRC="${PLATFORM_SRC}"
   INCLUDES=(-I"${SRC_ROOT}/app" -I"${VISION_SRC}" -I"${NAV_SRC}"
     -I"${MOTION_SRC}" -I"${IMU_SRC}" -I"${TOF_SRC}"
     -I"${TELEMETRY_SRC}" -I"${DISPLAY_SRC}" -I"${SMARTCAR_SRC}"
     -I"${SMARTCAR_SRC}/safety" -I"${DRIVER_SRC}/inc")
-  LIBS=(-pthread)
+  LIBS=(-pthread -ldl -lm)
   if [[ -n "${OPENCV_DIR}" ]]; then
     INCLUDES+=(-I"${OPENCV_DIR}/include/opencv4")
     LIBS+=(

@@ -32,7 +32,7 @@ except ImportError:
 
 
 WINDOW_TITLE = "Rewrite 智能车控制台"
-SETTINGS_VERSION = 10
+SETTINGS_VERSION = 11
 
 DEFAULT_ENVIRONMENT_ROOT = str(
     Path.home() / "Downloads" / "lq环境配置 (2)"
@@ -91,7 +91,7 @@ DEFAULTS: dict[str, object] = {
     "imu_stationary_hold": 0.25,
     "imu_accel_swap_xy": False,
     "imu_stationary_zero": True,
-    "swap_motors": True,
+    "swap_motors": False,
     "swap_encoders": False,
     "vision_i_gain": 2.0,
     "vision_d_gain": 2.0,
@@ -596,7 +596,7 @@ class RewriteControlGui:
                 ("side_road", "启用环岛/侧路"),
                 ("tof_slope", "启用 TOF 坡道检测"),
                 ("imu_enabled", "启用 IMU（关闭后使用编码器降级）"),
-                ("swap_motors", "交换左右电机输出（当前控制器默认）"),
+                ("swap_motors", "交换左右电机输出（按实车接线选择）"),
                 ("swap_encoders", "交换左右编码器反馈"),
                 ("imu_accel_swap_xy", "交换 IMU 前向/右向加速度轴"),
                 ("imu_stationary_zero", "启用 IMU 静止速度归零（ZUPT）"),
@@ -1020,12 +1020,18 @@ class RewriteControlGui:
                     values["swap_motors"] = DEFAULTS["swap_motors"]
                     values["swap_encoders"] = DEFAULTS["swap_encoders"]
                     self._append_log(
-                        "[设置] 已启用左右电机交换；编码器保持原通道"
+                        "[设置] 已重置左右电机交换参数为实车接线配置"
                     )
                 if saved_version < 9:
                     values["disable_line_lost_stop"] = DEFAULTS[
                         "disable_line_lost_stop"
                     ]
+                if saved_version < 11:
+                    values["swap_motors"] = DEFAULTS["swap_motors"]
+                    values["swap_encoders"] = DEFAULTS["swap_encoders"]
+                    self._append_log(
+                        "[设置] 已按实车接线关闭左右电机交换；编码器保持原通道"
+                    )
                 if legacy_aggressive:
                     self._append_log(
                         "[设置] 检测到激进参数；可点击“恢复安全默认参数”"
@@ -1184,11 +1190,8 @@ class RewriteControlGui:
         values = self._save_settings(quiet=True)
         if values is None:
             return
-        try:
-            self._validate_environment_root(str(values["environment_root"]))
-        except ValueError as exc:
-            messagebox.showerror("无法部署", str(exc), parent=self.root)
-            return
+        # 原生 Windows 构建链（build_rewrite.ps1）自动解析工具链与依赖，
+        # 不再依赖 lq环境配置 目录，因此不做环境目录阻断校验。
         if not self.deploy_script.is_file():
             messagebox.showerror(
                 "无法部署",
