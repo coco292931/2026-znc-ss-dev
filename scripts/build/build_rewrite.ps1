@@ -9,7 +9,7 @@
     编译 / 链接 / ABI 校验。不需要 WSL、Git-Bash 或任何 bash 环境。
 
     模式与 scripts/build/build_rewrite.sh 一一对应：
-      selftest | target | replay | display-example | motor-test | motor-test-sim
+      selftest | target | replay | probe | display-example | motor-test | motor-test-sim
 
     相较 .sh 版修掉的两个 replay 缺陷：
       1. SMARTCAR_SRC 未定义 —— .sh 的 replay 分支引用了它却从未赋值（Linux 上同样会挂）
@@ -24,8 +24,9 @@
 
 .PARAMETER Mode
     selftest        主机自测程序（-DPATH_FOLLOW_NO_OPENCV -DPATH_FOLLOW_NO_HW）
-    target          主程序 lq_path_follow_rewrite（需要 OpenCV；ncnn 可选）
+    target          主程序 lq_path_follow_coco_rewrite（需要 OpenCV；ncnn 可选）
     replay          离线视频回放（rewrite_video_replay）
+    probe           单帧视觉探针（frame_probe，喂图片 dump 内部网格）
     display-example ST7735S 屏幕示例
     motor-test      电机抖动测试（真硬件）
     motor-test-sim  电机抖动测试（SMARTCAR_SIM 仿真，不碰硬件）
@@ -66,7 +67,7 @@
 [CmdletBinding()]
 param(
     [Parameter(Position = 0)]
-    [ValidateSet('selftest', 'target', 'replay', 'display-example', 'motor-test', 'motor-test-sim')]
+    [ValidateSet('selftest', 'target', 'replay', 'probe', 'display-example', 'motor-test', 'motor-test-sim')]
     [string]$Mode = 'selftest',
 
     [string]$ToolchainRoot,
@@ -430,7 +431,7 @@ Write-Host ("           {0}" -f $cxxFull) -ForegroundColor DarkGray
 Write-Host ("  仓库   : {0}" -f $RepoRoot)
 Write-Host ("  模式   : {0}   并行: {1}" -f $Mode, $Jobs)
 
-$needOpenCv = $Mode -in @('target', 'replay')
+$needOpenCv = $Mode -in @('target', 'replay', 'probe')
 $ocvRoot = $null
 if ($needOpenCv) {
     $ocvRoot = Resolve-DepDir -Explicit $OpenCvDir -EnvValue $env:OPENCV_DIR -Candidates $knownOcv `
@@ -475,6 +476,7 @@ $Common = @(
 $CoreSrc = @(
     (Join-Path $NavSrc 'path_params.cpp')
     (Join-Path $VisionSrc 'vision_pipeline.cpp')
+    (Join-Path $VisionSrc 'track_topology.cpp')
     (Join-Path $NavSrc 'path_controller.cpp')
     (Join-Path $MotionSrc 'motion_control.cpp')
     (Join-Path $MotionSrc 'motor_adapter.cpp')
@@ -612,6 +614,7 @@ switch ($Mode) {
             (Join-Path $AppSrc 'video_replay.cpp')
             (Join-Path $NavSrc 'path_params.cpp')
             (Join-Path $VisionSrc 'vision_pipeline.cpp')
+            (Join-Path $VisionSrc 'track_topology.cpp')
             (Join-Path $NavSrc 'path_controller.cpp')
         ) + $libs + @('-o', (ConvertTo-GccPath $out))
 
@@ -627,10 +630,36 @@ switch ($Mode) {
         exit 0
     }
 
+    'probe' {
+        Write-Section '构建 probe'
+        # 单帧视觉探针：不需要路径控制器，只要视觉流水线本身。
+        $out = Join-Path $BuildDir 'frame_probe'
+        $includes = $Common + @("-I$(ConvertTo-GccPath $PlatformSrc)") + $OpenCvIncludes
+        $libs = @('-pthread', '-ldl', '-lm') + $OpenCvLibs
+
+        $argList = $includes + @(
+            (Join-Path $AppSrc 'frame_probe.cpp')
+            (Join-Path $NavSrc 'path_params.cpp')
+            (Join-Path $VisionSrc 'vision_pipeline.cpp')
+            (Join-Path $VisionSrc 'track_topology.cpp')
+        ) + $libs + @('-o', (ConvertTo-GccPath $out))
+
+        $text = & $Cxx @argList 2>&1 | Out-String
+        if ($LASTEXITCODE -ne 0) {
+            ($text -split "`r?`n" | Where-Object { $_ -match 'error' } | Select-Object -First 25) |
+                ForEach-Object { Write-Host "  $_" -ForegroundColor Red }
+            Write-Host 'probe 编译失败' -ForegroundColor Red
+            exit 1
+        }
+        Write-Host ("  built {0}" -f $out) -ForegroundColor Green
+        if (-not $NoVerify) { [void](Test-ArtifactAbi -ReadElf $ReadElf -Path $out -GlibcMax $TargetGlibcMax) }
+        exit 0
+    }
+
     'target' {
         Write-Section '构建 target（增量）'
 
-        $out = Join-Path $BuildDir 'lq_path_follow_rewrite'
+        $out = Join-Path $BuildDir 'lq_path_follow_coco_rewrite'
         $objDir = Join-Path $BuildDir 'obj-target'
         New-Item -ItemType Directory -Force -Path $objDir | Out-Null
 
@@ -722,7 +751,7 @@ switch ($Mode) {
             $needLink = @($objects | Where-Object { (Get-Item -LiteralPath $_).LastWriteTime -gt $outTime }).Count -gt 0
         }
         if ($needLink) {
-            Write-Host '    LINK build/rewrite/lq_path_follow_rewrite' -ForegroundColor DarkGray
+            Write-Host '    LINK build/rewrite/lq_path_follow_coco_rewrite' -ForegroundColor DarkGray
             $linkArgs = @('-fopenmp') + ($objects | ForEach-Object { ConvertTo-GccPath $_ }) + $libs + @('-o', (ConvertTo-GccPath $out))
             $text = & $Cxx @linkArgs 2>&1 | Out-String
             if ($LASTEXITCODE -ne 0) {

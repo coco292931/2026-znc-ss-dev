@@ -139,14 +139,14 @@ cm_per_col(row) = cm_per_col(最近有效行) * d(row) / d(最近有效行)   �
 
 ```bash
 # 拓扑观测（默认关）
-./lq_path_follow_rewrite --http 8080 --dry-run --topology
-./lq_path_follow_rewrite --http 8080 --dry-run --topology --topology-side-rows 33 --topology-min-area 8
+./lq_path_follow_coco_rewrite --http 8080 --dry-run --topology
+./lq_path_follow_coco_rewrite --http 8080 --dry-run --topology --topology-side-rows 33 --topology-min-area 8
 
 # 厘米误差（默认关）
-./lq_path_follow_rewrite --http 8080 --dry-run --cm-error --track-width-cm 45
+./lq_path_follow_coco_rewrite --http 8080 --dry-run --cm-error --track-width-cm 45
 
 # 两者同时（推荐的首次上车对比方式）
-./lq_path_follow_rewrite --http 8080 --dry-run --topology --cm-error --track-width-cm 45
+./lq_path_follow_coco_rewrite --http 8080 --dry-run --topology --cm-error --track-width-cm 45
 ```
 
 banner 会打印一行确认：

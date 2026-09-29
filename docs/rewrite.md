@@ -5,6 +5,14 @@ longest-white-column vision pipeline. Source files are organized by function
 under `src/`, with build, deployment, board, GUI, and telemetry tools under
 `scripts/`.
 
+> Board build name: the deployed program is **`lq_path_follow_coco_rewrite`**
+> (`build/rewrite/lq_path_follow_coco_rewrite`, installed at
+> `/home/root/lq_path_follow_coco_rewrite`). Some command examples further down
+> still spell the older `lq_path_follow_rewrite` name; substitute the new one.
+> The board address is `192.168.43.178`.
+> Deployment is native Windows (Windows OpenSSH); the WSL notes below are
+> historical.
+
 ## Control flow
 
 长期维护和合并代码前先阅读
@@ -289,10 +297,10 @@ Canonical Windows deployment uses the reorganized tree:
 ```
 
 The deployment uses the fixed WSL Ubuntu environment and old-world LoongArch
-GCC 8.3, verifies checksums, installs `/home/root/lq_path_follow_rewrite`
+GCC 8.3, verifies checksums, installs `/home/root/lq_path_follow_coco_rewrite`
 atomically, and keeps a `.bak`.
 
-The default board is `root@192.168.43.220`. Builds are incremental and compile
+The default board is `root@192.168.43.178`. Builds are incremental and compile
 independent translation units in parallel. Unchanged binaries, calibration,
 and model files are skipped by SHA-256, while SSH connection multiplexing
 avoids repeated handshakes. Useful overrides:
@@ -301,7 +309,7 @@ avoids repeated handshakes. Useful overrides:
 .\scripts\deploy\deploy_rewrite.ps1 -Jobs 6
 .\scripts\deploy\deploy_rewrite.ps1 -BuildOnly
 .\scripts\deploy\deploy_rewrite.ps1 -ForceRebuild
-.\scripts\deploy\deploy_rewrite.ps1 -BoardIP 192.168.43.220 -SkipModels
+.\scripts\deploy\deploy_rewrite.ps1 -BoardIP 192.168.43.178 -SkipModels
 ```
 
 ## Telemetry and trajectory
@@ -463,7 +471,7 @@ control process that publishes rewrite telemetry) drives the course:
 
 ```bash
 python scripts/telemetry/record_inertial_path.py \
-  --url http://192.168.43.220:8080/telemetry \
+  --url http://192.168.43.178:8080/telemetry \
   --output build/paths/course.csv
 ```
 
@@ -489,7 +497,7 @@ After `[IMU] ready` appears, manually move the vehicle while recording:
 
 ```bash
 python scripts/telemetry/record_imu_path.py \
-  --url http://192.168.43.220:8080/telemetry \
+  --url http://192.168.43.178:8080/telemetry \
   --output build/paths/imu_course.csv
 ```
 

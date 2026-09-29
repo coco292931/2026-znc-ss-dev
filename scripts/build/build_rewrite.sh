@@ -95,7 +95,7 @@ if [[ "${MODE}" == "target" ]]; then
   NCNN_DIR="${NCNN_DIR:-}"
   SMARTCAR_SRC="${PLATFORM_SRC}"
   SENSOR_SRC="${SRC_ROOT}/sensors"
-  OUT="${BUILD_DIR}/lq_path_follow_rewrite"
+  OUT="${BUILD_DIR}/lq_path_follow_coco_rewrite"
   OBJ_DIR="${BUILD_DIR}/obj-target"
   INCLUDES=(-I"${SRC_ROOT}/app" -I"${VISION_SRC}" -I"${NAV_SRC}"
     -I"${MOTION_SRC}" -I"${IMU_SRC}" -I"${TOF_SRC}"
@@ -251,6 +251,7 @@ if [[ "${MODE}" == "replay" ]]; then
     "${SRC_ROOT}/app/video_replay.cpp" \
     "${NAV_SRC}/path_params.cpp" \
     "${VISION_SRC}/vision_pipeline.cpp" \
+    "${VISION_SRC}/track_topology.cpp" \
     "${NAV_SRC}/path_controller.cpp" \
     "${LIBS[@]}" -o "${OUT}"
   echo "built ${OUT}"

@@ -35,7 +35,7 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--url",
-        default="http://192.168.43.220:8080/telemetry",
+        default="http://192.168.43.178:8080/telemetry",
         help="车辆遥测地址",
     )
     parser.add_argument(

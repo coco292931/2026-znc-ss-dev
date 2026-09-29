@@ -340,6 +340,8 @@ void HttpMjpegStreamer::handle_client(int fd) {
         telemetry_client(fd);
     } else if (req.find("GET /stats") == 0) {
         send_stats(fd);
+    } else if (req.find("GET /vision-dump") == 0) {
+        send_vision_dump(fd);
     } else if (req.find("GET /vision-params") == 0) {
         send_vision_params(fd);
     } else if (req.find("POST /vision-params") == 0) {
@@ -410,6 +412,129 @@ void HttpMjpegStreamer::send_stats(int fd) {
         bn);
     write_all(fd, header, static_cast<std::size_t>(hn));
     write_all(fd, body, static_cast<std::size_t>(bn));
+}
+
+void HttpMjpegStreamer::send_vision_dump(int fd) {
+    RenderSnapshot snap;
+    {
+        std::lock_guard<std::mutex> lock(snapshot_mutex_);
+        snap = snapshot_;
+    }
+
+    std::string body;
+    body.reserve(24000);
+    char line[512];
+
+    if (!snap.valid) {
+        body = "snapshot invalid\n";
+    } else {
+        const RoadEstimateLite& r = snap.road;
+        const RoadImageInfo& i = r.info;
+
+        // 主线程真实的轮子遮罩框（寻线搜索的锚点）。
+        const LegacyVisionPipeline& v = vision_ ? *vision_ : renderer_;
+        const WheelMaskBox box = v.wheel_mask_box();
+        std::snprintf(line, sizeof(line),
+                      "wheel_box %d %d %d %d auto=%d top_minus_1=%d\n",
+                      box.left, box.right, box.top, box.bottom,
+                      box.auto_detected ? 1 : 0, box.top - 1);
+        body += line;
+
+        std::snprintf(line, sizeof(line),
+                      "info top=%d bottom=%d max_column=%d white_num=%d "
+                      "last_mid=%d control_row=%d far_row=%d anchor_row=%d\n",
+                      i.top, i.bottom, i.max_column, i.white_num, i.last_mid,
+                      i.control_row, i.far_row, i.vehicle_anchor_row);
+        body += line;
+
+        std::snprintf(line, sizeof(line),
+                      "losts left=%d right=%d both=%d scan_rows=%d\n",
+                      i.left_lost_count, i.right_lost_count,
+                      i.both_lost_count, i.bottom - i.top);
+        body += line;
+
+        std::snprintf(line, sizeof(line),
+                      "errors line=%.6f far=%.6f vehicle=%.6f conf=%.4f "
+                      "lost=%d pair_valid=%d\n",
+                      r.line_error, r.far_error, r.vehicle_center_error,
+                      r.line_confidence, r.line_lost ? 1 : 0,
+                      r.bottom_pair_valid ? 1 : 0);
+        body += line;
+
+        std::snprintf(line, sizeof(line),
+                      "cm valid=%d per_col_control=%.4f per_col_far=%.4f "
+                      "line_cm=%.2f far_cm=%.2f vehicle_cm=%.2f\n",
+                      r.cm_scale_valid ? 1 : 0, r.cm_per_col_control,
+                      r.cm_per_col_far, r.line_error_cm, r.far_error_cm,
+                      r.vehicle_center_error_cm);
+        body += line;
+
+        std::snprintf(line, sizeof(line),
+                      "misc threshold=%d blue_pixels=%d cross=%d zebra=%d "
+                      "L_branch=%d R_branch=%d\n",
+                      r.vision_threshold, r.vision_blue_mask_pixels,
+                      r.elements.cross ? 1 : 0, r.elements.zebra ? 1 : 0,
+                      r.elements.left_branch_count,
+                      r.elements.right_branch_count);
+        body += line;
+
+        const TopologyReport& t = r.topology;
+        std::snprintf(line, sizeof(line),
+                      "topology valid=%d track_area=%d far=%d near=%d "
+                      "seed=%d,%d L(border=%d area=%d) R(border=%d area=%d)\n",
+                      t.valid ? 1 : 0, t.track_area, t.track_far_row,
+                      t.track_near_row, t.seed_col, t.seed_row,
+                      t.left.border_white_rows, t.left.area,
+                      t.right.border_white_rows, t.right.area);
+        body += line;
+
+        // 二值网格：'#' 白（赛道），'.' 黑。row 0 = 远，row 59 = 车头。
+        body += "GRID binary (# = white)\n";
+        for (int y = 0; y < kBinaryHeight; ++y) {
+            line[0] = static_cast<char>('0' + (y / 10));
+            line[1] = static_cast<char>('0' + (y % 10));
+            line[2] = ' ';
+            body.append(line, 3);
+            for (int x = 0; x < kBinaryWidth; ++x) {
+                body += snap.vision_frame.binary[y][x] ? '#' : '.';
+            }
+            body += '\n';
+        }
+
+        // 灰度网格：二值化之前的原始亮度，两位十六进制。用来判断阈值是否合适。
+        body += "GRID gray (hex)\n";
+        static const char kHex[] = "0123456789abcdef";
+        for (int y = 0; y < kBinaryHeight; ++y) {
+            line[0] = static_cast<char>('0' + (y / 10));
+            line[1] = static_cast<char>('0' + (y % 10));
+            line[2] = ' ';
+            body.append(line, 3);
+            for (int x = 0; x < kBinaryWidth; ++x) {
+                const std::uint8_t g = snap.vision_frame.gray[y][x];
+                body += kHex[g >> 4];
+                body += kHex[g & 0x0F];
+            }
+            body += '\n';
+        }
+
+        body += "EDGES row left lv right rv width mid\n";
+        for (int y = 0; y < kBinaryHeight; ++y) {
+            std::snprintf(line, sizeof(line), "%2d %3d %d %3d %d %3d %3d\n",
+                          y, r.left[y], r.left_valid[y] ? 1 : 0, r.right[y],
+                          r.right_valid[y] ? 1 : 0, r.width[y], r.mid[y]);
+            body += line;
+        }
+    }
+
+    char header[256];
+    const int hn = std::snprintf(
+        header, sizeof(header),
+        "HTTP/1.1 200 OK\r\nContent-Type: text/plain; charset=utf-8\r\n"
+        "Content-Length: %zu\r\nCache-Control: no-store\r\n"
+        "Connection: close\r\n\r\n",
+        body.size());
+    write_all(fd, header, static_cast<std::size_t>(hn));
+    write_all(fd, body.data(), body.size());
 }
 
 void HttpMjpegStreamer::send_json(int fd,

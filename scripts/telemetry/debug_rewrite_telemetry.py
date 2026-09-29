@@ -83,7 +83,7 @@ def should_stop(stop_file: Path | None, deadline: float | None) -> bool:
 
 def main() -> int:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--url", default="http://192.168.43.220:8080/telemetry")
+    parser.add_argument("--url", default="http://192.168.43.178:8080/telemetry")
     parser.add_argument("--interval", type=float, default=0.5)
     parser.add_argument("--duration", type=float, default=0.0)
     parser.add_argument("--stop-file", type=Path)

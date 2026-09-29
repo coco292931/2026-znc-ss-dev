@@ -70,6 +70,7 @@ private:
     void send_index(int fd);
     void send_stats(int fd);
     void send_vision_params(int fd);
+    void send_vision_dump(int fd);
     void update_vision_params(int fd, const std::string& body);
     void send_wheel_box(int fd);
     void update_wheel_box(int fd, const std::string& body);

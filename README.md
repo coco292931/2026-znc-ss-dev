@@ -4,7 +4,7 @@
 
 ## 项目定位
 
-当前主程序是 LoongArch 板端运行的 `lq_path_follow_rewrite`。控制主链路为：
+当前主程序是 LoongArch 板端运行的 `lq_path_follow_coco_rewrite`。控制主链路为：
 
 ```text
 摄像头帧 -> 视觉边线/误差 -> 路径控制 -> IMU 偏航反馈
@@ -65,7 +65,7 @@ build/                  构建和运行输出（首次构建时生成）
 - OpenCV 4：`target` 和 `replay` 需要 OpenCV；可通过 `OPENCV_DIR` 指定安装目录，或让 `pkg-config opencv4` 可用。
 - NCNN：启用目标识别并执行部署时需要 `ncnn_install`；构建脚本通过 `NCNN_DIR` 指定。
 - Python 3 和 `matplotlib`：遥测记录、轨迹绘图和 GUI 的 Python 后端需要。
-- 板端 SSH：默认连接 `root@192.168.43.220`，并需要可用的 SSH 密钥或其他 BatchMode 认证方式。
+- 板端 SSH：默认连接 `root@192.168.43.178`，并需要可用的 SSH 密钥或其他 BatchMode 认证方式。
 
 Windows 原生交叉构建使用 mingw 宿主的 LoongArch GCC 8.3 工具链（如 `$USERPROFILE\Downloads\lstc83\loongson-gnu-toolchain-8.3-i686-mingw-loongarch64-linux-gnu-rc1.6`；发布 zip 缺失的 GCC 头文件由 `scripts/build/patches/` 在构建时自动补装），OpenCV/NCNN 依赖自动从 `$USERPROFILE\Downloads\longTech-Study\...\LQ_Dep_libs` 解析，可用 `-ToolchainRoot` / `-OpenCvDir` / `-NcnnDir` 覆盖。历史 WSL 流程（`deploy_rewrite.sh` + `Downloads\lq环境配置 (2)`）保留备用，不再默认使用。
 
@@ -93,7 +93,7 @@ scripts/build/build_rewrite.sh motor-test-sim
 各模式用途：
 
 - `selftest`：不依赖 OpenCV 和硬件的路径控制回归测试。
-- `target`：生成板端主程序 `build/rewrite/lq_path_follow_rewrite`。
+- `target`：生成板端主程序 `build/rewrite/lq_path_follow_coco_rewrite`。
 - `replay`：生成离线视频回放程序，需要 OpenCV。
 - `display-example`：生成 ST7735S 显示示例，通常需要 Linux 的 `sys/mman.h` 等头文件。
 - `motor-test`：使用 Loongson GPIO 的电机抖动分层测试。
@@ -131,13 +131,13 @@ Windows 端使用 PowerShell 入口（本机交叉构建 + Windows 自带 OpenSS
 - `-SkipModels` 跳过 NCNN 模型同步；部署脚本仍会检查本地 NCNN 依赖目录。
 - 上传前后都会计算 SHA-256；旧程序默认保留为 `.bak`，可用 `-NoBackup` 关闭。
 
-部署产物为板端 `/home/root/lq_path_follow_rewrite`，同时同步：
+部署产物为板端 `/home/root/lq_path_follow_coco_rewrite`，同时同步：
 
 - `/home/root/rewrite/标定数据.txt`
 - `/home/root/models/best.ncnn.param`、`best.ncnn.bin`、`model_metadata.json`
 - `/home/root/setup_st7735s_spi.sh` 和 `/home/root/record_imu_path.sh`
 
-启用运行模式后，板端 HTTP 地址默认是 `http://192.168.43.220:8080`，遥测接口为 `/telemetry`，视频接口为 `/stream`。
+启用运行模式后，板端 HTTP 地址默认是 `http://192.168.43.178:8080`，遥测接口为 `/telemetry`，视频接口为 `/stream`。
 
 历史 WSL Bash 后端仍可调用（需要 `lq环境配置 (2)` 下的 Linux 工具链；默认流程已不再使用）：
 

@@ -7,6 +7,7 @@ if [ "$#" -gt 0 ]; then
 fi
 
 if pidof lq_path_follow_imu >/dev/null 2>&1 ||
+   pidof lq_path_follow_coco_rewrite >/dev/null 2>&1 ||
    pidof lq_path_follow_rewrite >/dev/null 2>&1; then
     echo "a path-follow process is already running; stop it first" >&2
     exit 1

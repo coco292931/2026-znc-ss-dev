@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-BOARD_IP="192.168.43.220"
+BOARD_IP="192.168.43.178"
 BOARD_USER="root"
 RUN_MODE="none"
 BUILD_JOBS=4
@@ -68,10 +68,10 @@ TC_ARCHIVE="${ENV_DIR}/${TC_NAME}.tar.xz"
 DEP_ROOT="${ENV_DIR}/LQ_Dep_libs"
 OCV="${DEP_ROOT}/opencv_install"
 NCNN="${DEP_ROOT}/ncnn_install"
-OUT="${REPO_ROOT}/build/rewrite/lq_path_follow_rewrite"
+OUT="${REPO_ROOT}/build/rewrite/lq_path_follow_coco_rewrite"
 BUILD_SCRIPT="${REPO_ROOT}/scripts/build/build_rewrite.sh"
 REMOTE="${BOARD_USER}@${BOARD_IP}"
-REMOTE_PATH="/home/root/lq_path_follow_rewrite"
+REMOTE_PATH="/home/root/lq_path_follow_coco_rewrite"
 REMOTE_UPLOAD="${REMOTE_PATH}.upload"
 IDENTITY_FILE="${HOME}/.ssh/deploy_rewrite_id_rsa"
 
@@ -168,7 +168,7 @@ else
 
     BACKUP="cp -f '${REMOTE_PATH}' '${REMOTE_PATH}.bak'"
     if [[ "${NO_BACKUP}" == "1" ]]; then BACKUP=":"; fi
-    ssh_board "set -e; killall lq_path_follow_rewrite 2>/dev/null || true; \
+    ssh_board "set -e; killall lq_path_follow_coco_rewrite 2>/dev/null || true; \
 if [ -f '${REMOTE_PATH}' ]; then ${BACKUP}; fi; \
 mv -f '${REMOTE_UPLOAD}' '${REMOTE_PATH}'; chmod +x '${REMOTE_PATH}'; sync"
 fi
@@ -234,18 +234,18 @@ if [[ "${RUN_MODE}" != "none" ]]; then
 --model-dir /home/root/models \
 --calibration /home/root/rewrite/标定数据.txt \
 --target-actions --target-input-size 32 --target-close-size 0.04 ${MODE_FLAG}"
-    ssh_board "set -e; killall lq_path_follow_rewrite 2>/dev/null || true; \
+    ssh_board "set -e; killall lq_path_follow_coco_rewrite 2>/dev/null || true; \
 cd /home/root; \
 nohup env LD_LIBRARY_PATH=/home/root/LQ_Dep_libs/opencv-lib:/home/root/LQ_Dep_libs/ncnn-lib \
-./lq_path_follow_rewrite ${RUN_ARGS} \
-> /home/root/lq_path_follow_rewrite.log 2>&1 </dev/null & \
-echo \$! > /home/root/lq_path_follow_rewrite.pid; sleep 2; \
-kill -0 \$(cat /home/root/lq_path_follow_rewrite.pid)"
+./lq_path_follow_coco_rewrite ${RUN_ARGS} \
+> /home/root/lq_path_follow_coco_rewrite.log 2>&1 </dev/null & \
+echo \$! > /home/root/lq_path_follow_coco_rewrite.pid; sleep 2; \
+kill -0 \$(cat /home/root/lq_path_follow_coco_rewrite.pid)"
     echo "==> Running ${RUN_MODE}: http://${BOARD_IP}:8080"
     echo "==> Telemetry: http://${BOARD_IP}:8080/telemetry"
 else
     if [[ "${BINARY_UPDATED}" == "0" ]]; then
-        ssh_board "killall lq_path_follow_rewrite 2>/dev/null || true"
+        ssh_board "killall lq_path_follow_coco_rewrite 2>/dev/null || true"
     fi
     echo "==> Installed independently; program not started"
 fi

@@ -207,8 +207,7 @@ void PathParams::print_help(const char* exe) const {
         "  --topology-side-rows <N> Near rows scanned for side-region seeds, default 33\n"
         "  --topology-min-area <N>  Minimum side-region area, default 8\n"
         "  --topology-seed-rows <N> Seed row fallback steps, default 4\n"
-        "  --cm-error              Publish centimetre errors (needs --track-width-cm)\
-"
+        "  --cm-error              Publish centimetre errors (needs --track-width-cm)\n"
         "  --no-cm-error           Disable centimetre errors\n"
         "  --track-width-cm <N>    Measured physical track width, default 45\n"
         "  --no-far-search         Stop using horizon-wide far search\n"

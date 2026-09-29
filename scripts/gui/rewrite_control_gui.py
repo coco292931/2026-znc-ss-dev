@@ -49,7 +49,7 @@ VIDEO_VIEWS = (
 )
 
 DEFAULTS: dict[str, object] = {
-    "board_ip": "192.168.43.220",
+    "board_ip": "192.168.43.178",
     "board_user": "root",
     "identity_file": "",
     "wsl_distribution": "Debian",
@@ -1924,9 +1924,9 @@ class RewriteControlGui:
         command.extend(
             [
                 remote,
-                "killall -INT lq_path_follow_rewrite 2>/dev/null || true; "
+                "killall -INT lq_path_follow_coco_rewrite 2>/dev/null || true; "
                 "sleep 1; "
-                "killall -TERM lq_path_follow_rewrite 2>/dev/null || true",
+                "killall -TERM lq_path_follow_coco_rewrite 2>/dev/null || true",
             ]
         )
         creation_flags = getattr(subprocess, "CREATE_NO_WINDOW", 0)

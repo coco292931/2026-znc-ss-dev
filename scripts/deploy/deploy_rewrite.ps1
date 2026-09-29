@@ -28,7 +28,7 @@ Build and deploy the reorganized lq_path_follow program.
 #>
 [CmdletBinding()]
 param(
-    [string]$BoardIP = "192.168.43.220",
+    [string]$BoardIP = "192.168.43.178",
     [string]$BoardUser = "root",
     [ValidateSet("None", "Dry", "Motors")]
     [string]$RunMode = "None",
@@ -50,6 +50,9 @@ param(
     [switch]$SkipModels,
     [switch]$NoBackup,
     [switch]$ConfirmWheelsLifted,
+    # 追加到板端命令行末尾的额外参数（仅 -RunMode Dry/Motors 时生效），例如：
+    #   -ExtraArgs "--topology --cm-error --track-width-cm 45"
+    [string]$ExtraArgs = "",
     [string]$IdentityFile = ""
 )
 
@@ -68,7 +71,7 @@ $env:LC_ALL = "C.UTF-8"
 # （原实现只用了两层 Parent，拼出 scripts\scripts\... 的错误路径）。
 $RepoRoot = Split-Path -Parent (Split-Path -Parent (Split-Path -Parent $PSCommandPath))
 $BuildScript = Join-Path $RepoRoot "scripts\build\build_rewrite.ps1"
-$Out = Join-Path $RepoRoot "build\rewrite\lq_path_follow_rewrite"
+$Out = Join-Path $RepoRoot "build\rewrite\lq_path_follow_coco_rewrite"
 
 if ($RunMode -eq "Motors" -and -not $ConfirmWheelsLifted) {
     throw "Motor mode refused. Lift the wheels, then pass -ConfirmWheelsLifted."
@@ -135,7 +138,7 @@ Write-Host "    SHA-256: $LocalHash"
 
 if ($BuildOnly) {
     Write-Host "`n=== Complete (BuildOnly) ===" -ForegroundColor Green
-    Write-Host "Artifact: build\rewrite\lq_path_follow_rewrite"
+    Write-Host "Artifact: build\rewrite\lq_path_follow_coco_rewrite"
     exit 0
 }
 
@@ -160,7 +163,7 @@ if (-not [string]::IsNullOrWhiteSpace($IdentityFile)) {
 }
 
 $Remote = "${BoardUser}@${BoardIP}"
-$RemotePath = "/home/root/lq_path_follow_rewrite"
+$RemotePath = "/home/root/lq_path_follow_coco_rewrite"
 $RemoteUpload = "${RemotePath}.upload"
 
 $SshOpts = @(
@@ -216,7 +219,7 @@ else {
     }
     $BackupCmd = "cp -f '$RemotePath' '${RemotePath}.bak'"
     if ($NoBackup) { $BackupCmd = ":" }
-    Invoke-SshBoard ("set -e; killall lq_path_follow_rewrite 2>/dev/null || true; " +
+    Invoke-SshBoard ("set -e; killall lq_path_follow_coco_rewrite 2>/dev/null || true; " +
         "if [ -f '$RemotePath' ]; then $BackupCmd; fi; " +
         "mv -f '$RemoteUpload' '$RemotePath'; chmod +x '$RemotePath'; sync") | Out-Null
 }
@@ -310,23 +313,26 @@ if ($RunMode -ne "None") {
         "--calibration /home/root/rewrite/标定数据.txt " +
         "--target-actions --target-input-size 32 --target-close-size 0.04 " +
         $ModeFlag
-    $StartCommand = 'set -e; killall lq_path_follow_rewrite 2>/dev/null || true; ' +
+    if (-not [string]::IsNullOrWhiteSpace($ExtraArgs)) {
+        $RunArgs = ($RunArgs.Trim() + " " + $ExtraArgs.Trim()).Trim()
+    }
+    $StartCommand = 'set -e; killall lq_path_follow_coco_rewrite 2>/dev/null || true; ' +
         'cd /home/root; ' +
         'nohup env LD_LIBRARY_PATH=/home/root/LQ_Dep_libs/opencv-lib:/home/root/LQ_Dep_libs/ncnn-lib ' +
-        './lq_path_follow_rewrite ' + $RunArgs + ' ' +
-        '> /home/root/lq_path_follow_rewrite.log 2>&1 </dev/null & ' +
-        'echo $! > /home/root/lq_path_follow_rewrite.pid; sleep 2; ' +
-        'kill -0 $(cat /home/root/lq_path_follow_rewrite.pid)'
+        './lq_path_follow_coco_rewrite ' + $RunArgs + ' ' +
+        '> /home/root/lq_path_follow_coco_rewrite.log 2>&1 </dev/null & ' +
+        'echo $! > /home/root/lq_path_follow_coco_rewrite.pid; sleep 2; ' +
+        'kill -0 $(cat /home/root/lq_path_follow_coco_rewrite.pid)'
     Invoke-SshBoard $StartCommand | Out-Null
     Write-Host "==> Running ${RunMode}: http://${BoardIP}:8080" -ForegroundColor Green
     Write-Host "==> Telemetry: http://${BoardIP}:8080/telemetry" -ForegroundColor Green
 }
 else {
     if ($BinaryUpdated -eq 0) {
-        Invoke-SshBoard "killall lq_path_follow_rewrite 2>/dev/null || true" | Out-Null
+        Invoke-SshBoard "killall lq_path_follow_coco_rewrite 2>/dev/null || true" | Out-Null
     }
     Write-Host "==> Installed independently; program not started"
 }
 
 Write-Host "`n=== Complete ===" -ForegroundColor Green
-Write-Host "Artifact: build\rewrite\lq_path_follow_rewrite"
+Write-Host "Artifact: build\rewrite\lq_path_follow_coco_rewrite"

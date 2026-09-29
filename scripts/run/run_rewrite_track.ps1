@@ -10,7 +10,7 @@ Start rewrite on the board, record telemetry automatically, and plot the run.
 #>
 [CmdletBinding()]
 param(
-    [string]$BoardIP = "192.168.43.220",
+    [string]$BoardIP = "192.168.43.178",
     [string]$BoardUser = "root",
     [string]$IdentityFile = "",
     [string]$PythonExe = "",
@@ -27,6 +27,9 @@ param(
     [ValidateRange(0.0, 1.0)]
     [double]$TargetPathTriggerY = 0.50,
     [string]$RemoteProgram = "",
+    # 追加到板端命令行末尾的额外参数，例如：
+    #   -ExtraArgs "--topology --cm-error --track-width-cm 45"
+    [string]$ExtraArgs = "",
     [switch]$DryRun,
     [ValidateRange(0, 86400)]
     [int]$AutoStopAfterSeconds = 0,
@@ -444,7 +447,7 @@ if ($ControllerVariant -eq "expt") {
     $RemoteInertialFallbackPath = "/home/root/expt/inertial_fallback.csv"
 } else {
     if ([string]::IsNullOrWhiteSpace($RemoteProgram)) {
-        $RemoteProgram = "/home/root/lq_path_follow_imu"
+        $RemoteProgram = "/home/root/lq_path_follow_coco_rewrite"
     }
     $CalibrationName = -join @(
         [char]0x6807,
@@ -456,8 +459,8 @@ if ($ControllerVariant -eq "expt") {
     $RemoteModelDirectory = "/home/root/models"
     $CalibrationPath = "/home/root/rewrite/$CalibrationName"
     $RemoteSetupScript = "/home/root/setup_st7735s_spi.sh"
-    $RemoteLogPath = "/home/root/lq_path_follow_rewrite.log"
-    $RemotePidPath = "/home/root/lq_path_follow_rewrite.pid"
+    $RemoteLogPath = "/home/root/lq_path_follow_coco_rewrite.log"
+    $RemotePidPath = "/home/root/lq_path_follow_coco_rewrite.pid"
     $RemoteInertialFallbackPath = "/home/root/rewrite_inertial_fallback.csv"
 }
 $ModeFlag = if ($DryRun) { "--dry-run" } else { "--enable-motors" }
@@ -661,6 +664,9 @@ $ProgramArguments = @(
 ) + $ControllerArguments + $ImuArguments + $SideRoadArguments +
     $TofArguments + $StopArguments + $NavigationArguments
 $RemoteArguments = $ProgramArguments -join " "
+if (-not [string]::IsNullOrWhiteSpace($ExtraArgs)) {
+    $RemoteArguments = ($RemoteArguments.Trim() + " " + $ExtraArgs.Trim()).Trim()
+}
 $CameraSelection = 'camera=/dev/video0'
 if ($ControllerVariant -eq "expt") {
     $CameraSelector = Join-Path $RepositoryRoot "expt/select_camera.sh"
@@ -677,7 +683,7 @@ set -e
 # A previous program or camera diagnostic can keep /dev/video0 open while its
 # threads are shutting down. Stop only known camera competitors, then wait for
 # their teardown before checking the device.
-camera_competitors="lq_path_follow_rewrite lq_path_follow_expt lq_path_follow_imu lq_path_follow lq_camera_yuv_test lq_camera_simple_test smartcar_camera_diag smartcar_vision_debug lq_marker_recognize"
+camera_competitors="lq_path_follow_coco_rewrite lq_path_follow_rewrite lq_path_follow_expt lq_path_follow_imu lq_path_follow lq_camera_yuv_test lq_camera_simple_test smartcar_camera_diag smartcar_vision_debug lq_marker_recognize"
 for competitor in $camera_competitors; do
   killall "$competitor" 2>/dev/null || true
 done
