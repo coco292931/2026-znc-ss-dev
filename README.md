@@ -59,7 +59,7 @@ build/                  构建和运行输出（首次构建时生成）
 ## 环境要求
 
 - Windows PowerShell：运行部署脚本和 GUI。
-- WSL，默认发行版为 `Debian`：执行板端交叉构建和部署。
+- PowerShell 7+（pwsh）：原生交叉构建需要；构建/部署脚本会自动探测 PATH 或便携版（如 `Downloads\pwsh7\app\pwsh.exe`）。
 - C++17 GCC/G++：`selftest`、模拟电机测试和本机工具使用。
 - LoongArch GCC 8.3：`target` 交叉编译必须使用 `loongarch64-linux-gnu-g++` 8.3。
 - OpenCV 4：`target` 和 `replay` 需要 OpenCV；可通过 `OPENCV_DIR` 指定安装目录，或让 `pkg-config opencv4` 可用。
@@ -67,11 +67,19 @@ build/                  构建和运行输出（首次构建时生成）
 - Python 3 和 `matplotlib`：遥测记录、轨迹绘图和 GUI 的 Python 后端需要。
 - 板端 SSH：默认连接 `root@192.168.43.220`，并需要可用的 SSH 密钥或其他 BatchMode 认证方式。
 
-部署脚本默认从 Windows 目录 `$USERPROFILE\Downloads\lq环境配置 (2)` 读取 LoongArch 工具链和依赖，WSL 中对应为 `/mnt/c/Users/.../Downloads/lq环境配置 (2)`。可用 `-EnvironmentRoot` 覆盖。
+Windows 原生交叉构建使用 mingw 宿主的 LoongArch GCC 8.3 工具链（如 `$USERPROFILE\Downloads\lstc83\loongson-gnu-toolchain-8.3-i686-mingw-loongarch64-linux-gnu-rc1.6`；发布 zip 缺失的 GCC 头文件由 `scripts/build/patches/` 在构建时自动补装），OpenCV/NCNN 依赖自动从 `$USERPROFILE\Downloads\longTech-Study\...\LQ_Dep_libs` 解析，可用 `-ToolchainRoot` / `-OpenCvDir` / `-NcnnDir` 覆盖。历史 WSL 流程（`deploy_rewrite.sh` + `Downloads\lq环境配置 (2)`）保留备用，不再默认使用。
 
 ## 构建
 
-在 WSL 或 Bash 中从仓库根目录执行：
+Windows 原生交叉编译（推荐，需要 PowerShell 7）：
+
+```powershell
+.\scripts\build\build_rewrite.ps1 selftest
+.\scripts\build\build_rewrite.ps1 target
+.\scripts\build\build_rewrite.ps1 target -Jobs 8 -Force
+```
+
+在 WSL 或 Bash 中从仓库根目录执行（历史路径）：
 
 ```bash
 scripts/build/build_rewrite.sh selftest
@@ -105,7 +113,7 @@ scripts/build/build_rewrite.sh target
 
 ## 交叉编译与部署
 
-Windows 端推荐使用 PowerShell 入口：
+Windows 端使用 PowerShell 入口（本机交叉构建 + Windows 自带 OpenSSH 上传/安装，无需 WSL）：
 
 ```powershell
 .\scripts\deploy\deploy_rewrite.ps1
@@ -131,7 +139,7 @@ Windows 端推荐使用 PowerShell 入口：
 
 启用运行模式后，板端 HTTP 地址默认是 `http://192.168.43.220:8080`，遥测接口为 `/telemetry`，视频接口为 `/stream`。
 
-底层 Bash 后端也可直接调用：
+历史 WSL Bash 后端仍可调用（需要 `lq环境配置 (2)` 下的 Linux 工具链；默认流程已不再使用）：
 
 ```bash
 scripts/deploy/deploy_rewrite.sh --help
@@ -204,8 +212,8 @@ scripts/build/build_rewrite.sh selftest
 
 ## 已知限制与范围
 
-- Windows 原生没有 Bash 时，使用 WSL 或 Git Bash；部署脚本本身默认通过 WSL Debian 执行。
-- 目标板构建必须使用 GCC 8.3 LoongArch 工具链，不能用主机的 MinGW 或普通 x86 GCC 代替。
+- 部署脚本默认走 Windows 原生链路（本机交叉构建 + Windows 自带 OpenSSH）；历史 WSL 流程保留在 `deploy_rewrite.sh` 中备用。
+- 目标板构建必须使用 LoongArch GCC 8.3 交叉工具链（可用 mingw 宿主版本在 Windows 本机运行），不能用本机 MinGW/x86 编译器直接编译板端程序。
 - `target` 需要 OpenCV；部署和目标识别还需要 NCNN 依赖及三个模型文件。
 - 电机模式具有物理风险，必须抬轮并显式确认；运行中的失控保护仍应视为最后一道保护。
 - 本目录没有复制旧版 `expt`、历史巡线资料、旧测试/回放示例和不参与当前目标程序的文件。

@@ -393,6 +393,28 @@ if ($cxxVersion -notlike '8.3*') {
 }
 $cxxFull = (& $Cxx --version 2>&1 | Select-Object -First 1)
 
+# --- 工具链自愈 ---------------------------------------------------------
+# i686-mingw rc1.6 发布 zip 漏装了 GCC 内部 limits.h：
+#   <tc>\lib\gcc\loongarch64-linux-gnu\8.3.0\include\limits.h
+# 缺它时 glibc 的 #include_next <limits.h> 链条断裂，OpenCV/limits 相关
+# 编译报 "no include path in which to search for limits.h"。
+# 仓库内 scripts\build\patches\limits.h 保存补丁版本，缺失时自动补装，
+# 重新解压工具链 zip 后无需手工处理（详见 patches\README.md）。
+$tcLimitsRel = 'lib\gcc\loongarch64-linux-gnu\8.3.0\include\limits.h'
+$tcLimits = Join-Path $tcRoot $tcLimitsRel
+if (-not (Test-Path -LiteralPath $tcLimits)) {
+    $patchLimits = Join-Path $PSScriptRoot 'patches\limits.h'
+    if (Test-Path -LiteralPath $patchLimits -PathType Leaf) {
+        New-Item -ItemType Directory -Force -Path (Split-Path -Parent $tcLimits) | Out-Null
+        Copy-Item -LiteralPath $patchLimits -Destination $tcLimits -Force
+        Write-Host '  自愈: 工具链缺 limits.h，已用 scripts\build\patches\limits.h 补装' -ForegroundColor Yellow
+    }
+    else {
+        Write-Host '  警告: 工具链缺 lib\gcc\...\include\limits.h，且未找到 scripts\build\patches\limits.h。' -ForegroundColor Red
+        Write-Host '        OpenCV/limits 相关编译可能会失败。' -ForegroundColor DarkGray
+    }
+}
+
 $depCandidatesRoot = Join-Path $env:USERPROFILE 'Downloads\longTech-Study'
 $knownOcv = @(
     (Join-Path $depCandidatesRoot 'Loongson_2k300_301_Library-龙邱\Loongson_2K300_301_LIB\tools\LQ_Dep_libs\opencv_install'),

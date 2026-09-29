@@ -213,7 +213,9 @@ if ($CrossHeadingGrid -gt 0 -and
 if (-not $NoTofSlope -and $RampSpeed -gt $MaxSpeed) {
     throw "RampSpeed must not exceed MaxSpeed."
 }
-$RepositoryRoot = Split-Path -Parent (Split-Path -Parent $PSCommandPath)
+# run_rewrite_track.ps1 位于 <repo>\scripts\run\ 下，需要上溯三层到仓库根
+# （原实现只用了两层 Parent，拼出 scripts\scripts\... 的错误路径）。
+$RepositoryRoot = Split-Path -Parent (Split-Path -Parent (Split-Path -Parent $PSCommandPath))
 $DefaultInertialFallbackPath = Join-Path (
     Join-Path $RepositoryRoot "build\paths"
 ) "course.csv"
@@ -306,7 +308,10 @@ $IsBundled = (
     (Test-Path -LiteralPath $BundledDebugger -PathType Leaf)
 )
 if ($IsBundled) {
-    $WorkRoot = $PSScriptRoot
+    # 工作与输出目录固定在仓库根（README: build/trajectory/）。
+    # 原实现用 $PSScriptRoot（scripts\run），轨迹 CSV/日志会落到错误位置，
+    # GUI 也会在 build\trajectory\ 下找不到新文件。
+    $WorkRoot = $RepositoryRoot
     $Recorder = $BundledRecorder
     $Plotter = $BundledPlotter
     $Debugger = $BundledDebugger
