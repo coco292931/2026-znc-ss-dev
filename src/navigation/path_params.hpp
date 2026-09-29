@@ -254,6 +254,22 @@ struct PathParams {
     double lock_slope_tolerance = 0.35;
     double round_stable_tolerance = 2.0;
 
+    // BOOM 连通域拓扑观测层（移植自 BOOM 的 basemap/leftmap/rightmap 原语）。
+    // 默认关。打开后只在 RoadEstimateLite::topology 里产出观测结果，
+    // 不修改线误差或任何导航状态（符合 docs/logic-invariants.md）。
+    // 注意：本层不含 BOOM 的摄像头标定数值（standardK/standardB/k1/k2），
+    // 下列阈值只是算法量级，必须按本车安装位置/角度实测确认。
+    bool enable_topology = false;
+    int topology_side_rows = 33;       // 侧区域种子搜索的近端行数（BOOM STEP1）
+    int topology_min_region_area = 8;  // 侧区域最小面积，仅用于剔除噪点
+    int topology_seed_search_rows = 4; // 起点所在行找不到白点时的回退行数
+
+    // 归一化误差 -> 物理厘米，默认关。
+    // 只需实测一项 track_width_cm：逐行 cm/列 = 赛道物理宽度 / 该行双边实测列宽；
+    // 单边行按标定表的距离比例外推（透视下横向比例正比于距离）。
+    bool cm_error_enable = false;
+    double track_width_cm = 45.0;
+
     void parse(int argc, char** argv);
     void print_banner() const;
     bool target_inertial_routes_enabled() const;

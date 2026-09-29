@@ -29,6 +29,7 @@ COMMON=(-std=c++17 -O2 -Wall -Wextra
 CORE_SRC=(
   "${NAV_SRC}/path_params.cpp"
   "${VISION_SRC}/vision_pipeline.cpp"
+  "${VISION_SRC}/track_topology.cpp"
   "${NAV_SRC}/path_controller.cpp"
   "${MOTION_SRC}/motion_control.cpp"
   "${MOTION_SRC}/motor_adapter.cpp"

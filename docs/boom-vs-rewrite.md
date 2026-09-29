@@ -426,6 +426,8 @@ rewrite 在这块的**能力明显弱于 BOOM**（没有三岔/车库/往返十�
 
 **BOOM → rewrite（推荐）**
 
+> 其中第 1 条与第 5 条已实施，见 [`boom-topology-port.md`](boom-topology-port.md)。
+
 1. **`k1[i]` 逐行横向比例 + `k2[i]` 行→cm 表**：把 rewrite 的归一化误差换成物理 cm，`near_yaw_gain`/`far_yaw_gain` 立刻有物理意义，换场地不必重调。**此条不受车体差异影响，是最高价值借鉴。**
 2. **`leftmap`/`rightmap` 双侧连通域**：给 rewrite 的 `side_open`/`roundabout` 一个硬几何证据（当前只靠 `left_branch_count > 0` 这类计数），环岛识别会稳得多。
 3. **行车记录仪**：与已有的 `--inertial-path` / target route 合并成"第一圈记录、第二圈复现"。

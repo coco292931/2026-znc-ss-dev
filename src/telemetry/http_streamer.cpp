@@ -643,7 +643,7 @@ void HttpMjpegStreamer::telemetry_client(int fd) {
 
 std::string HttpMjpegStreamer::telemetry_json(
     const TelemetrySample& sample) const {
-    char body[8192];
+    char body[16384];
     const NavigationCommand& nav = sample.navigation;
     const ControlDiagnostics& diag = sample.control.diagnostics;
     const MotorFeedbackLite& motor = sample.motor;
@@ -706,6 +706,18 @@ std::string HttpMjpegStreamer::telemetry_json(
         "\"round_track_row\":%d,\"round_recovery_row\":%d,"
         "\"two_side_stable\":%s,\"cross_score\":%d,"
         "\"zebra_active\":%s,\"zebra_encounter\":%d,\"round_score\":%d,"
+        "\"topo_valid\":%s,\"topo_track_area\":%d,"
+        "\"topo_track_far_row\":%d,\"topo_track_near_row\":%d,"
+        "\"topo_seed_col\":%d,\"topo_seed_row\":%d,"
+        "\"topo_left_border_rows\":%d,\"topo_left_border_is_track\":%s,"
+        "\"topo_left_area\":%d,\"topo_left_far_row\":%d,"
+        "\"topo_left_max_col\":%d,"
+        "\"topo_right_border_rows\":%d,\"topo_right_border_is_track\":%s,"
+        "\"topo_right_area\":%d,\"topo_right_far_row\":%d,"
+        "\"topo_right_max_col\":%d,"
+        "\"cm_scale_valid\":%s,\"cm_per_col_control\":%.6f,"
+        "\"cm_per_col_far\":%.6f,\"line_error_cm\":%.6f,"
+        "\"far_error_cm\":%.6f,\"vehicle_center_error_cm\":%.6f,"
         "\"vision_integral_error_s\":%.6f,"
         "\"vision_integral_yaw_rate_dps\":%.6f,"
         "\"vision_derivative_error_per_s\":%.6f,"
@@ -827,6 +839,28 @@ std::string HttpMjpegStreamer::telemetry_json(
         sample.road.elements.roundabout_stage !=
             RoundaboutVisionStage::Approach
                 ? p_.round_enter_frames : 0,
+        sample.road.topology.valid ? "true" : "false",
+        sample.road.topology.track_area,
+        sample.road.topology.track_far_row,
+        sample.road.topology.track_near_row,
+        sample.road.topology.seed_col,
+        sample.road.topology.seed_row,
+        sample.road.topology.left.border_white_rows,
+        sample.road.topology.left.border_is_track ? "true" : "false",
+        sample.road.topology.left.area,
+        sample.road.topology.left.far_row,
+        sample.road.topology.left.max_col,
+        sample.road.topology.right.border_white_rows,
+        sample.road.topology.right.border_is_track ? "true" : "false",
+        sample.road.topology.right.area,
+        sample.road.topology.right.far_row,
+        sample.road.topology.right.max_col,
+        sample.road.cm_scale_valid ? "true" : "false",
+        sample.road.cm_per_col_control,
+        sample.road.cm_per_col_far,
+        sample.road.line_error_cm,
+        sample.road.far_error_cm,
+        sample.road.vehicle_center_error_cm,
         nav.vision_integral_error_s,
         nav.vision_integral_yaw_rate_dps,
         nav.vision_derivative_error_per_s,

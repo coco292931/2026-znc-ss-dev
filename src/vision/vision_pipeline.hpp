@@ -2,6 +2,7 @@
 
 #include "path_params.hpp"
 #include "path_types.hpp"
+#include "track_topology.hpp"
 
 #include <atomic>
 #include <cstdint>
@@ -92,6 +93,9 @@ private:
     double calc_error_at_row(const RoadEstimateLite& out, int row) const;
     void load_calibration();
     int row_for_distance(double distance_cm) const;
+    double distance_for_binary_row(int row) const;
+    void update_cm_scale(RoadEstimateLite* out);
+    void update_topology(RoadEstimateLite* out);
     int horizon_row() const;
     int image_row_to_binary_row(double image_row) const;
     void wheel_box(int* left, int* right, int* top, int* bottom) const;
@@ -116,6 +120,9 @@ private:
     mutable std::mutex wheel_box_mutex_;
     WheelMaskBox wheel_mask_box_;
     VisionFrame frame_;
+    // BOOM 连通域拓扑观测层。只在 --topology 打开时被调用；
+    // 内部网格放在堆上，避免每个 LegacyVisionPipeline 实例膨胀。
+    TrackTopology topology_;
     int last_blue_mask_pixels_ = 0;
     double last_error_ = 0.0;
     double last_far_error_ = 0.0;

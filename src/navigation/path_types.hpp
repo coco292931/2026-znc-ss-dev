@@ -206,6 +206,8 @@ struct RoadImageInfo {
     int white_num = 0;
     int max_column = kBinaryWidth / 2;
     int control_row = 0;
+    int far_row = 0;
+    int vehicle_anchor_row = 0;
     int left_lost_count = 0;
     int right_lost_count = 0;
     int both_lost_count = 0;
@@ -243,6 +245,44 @@ struct ElementFlags {
     bool red_block = false;
 };
 
+// BOOM 连通域拓扑观测结果。
+// 只在 --topology 打开时由 TrackTopology 填写；不参与任何巡线或控制计算。
+// 行序与网格一致：row 0 = 远端，row (kBinaryHeight-1) = 车头。
+struct TopologyRegion {
+    // 主信号：该侧边界列在近端范围内出现白色的行数。
+    // 正常直道的边界列一定是背景黑，因此 >0 就说明该侧白色区域
+    // 超出了主赛道（岔口 / 环岛入口 / 车库 / 或者是反光噪点）。
+    int border_white_rows = 0;
+    int border_near_row = -1;    // 边界白中最靠车头的行
+    int border_far_row = -1;     // 边界白中最远的行
+    // 边界白是否属于主赛道连通域（赛道本身顶到了该侧边界）。
+    bool border_is_track = false;
+
+    // 边界白中"不属于赛道"的那部分：从边界白出发、只在白色上生长
+    // 且不越过赛道得到的区域。
+    int area = 0;
+    int seed_count = 0;          // 独立的生长起点个数
+    int near_row = -1;
+    int far_row = -1;
+    int min_col = 0;
+    int max_col = 0;
+    double centroid_col = 0.0;
+    double centroid_row = 0.0;
+};
+
+struct TopologyReport {
+    bool valid = false;   // 赛道连通域有效
+    int width = 0;
+    int height = 0;
+    int seed_col = -1;    // 实际使用的洪水填充起点
+    int seed_row = -1;
+    int track_area = 0;
+    int track_far_row = -1;
+    int track_near_row = -1;
+    TopologyRegion left;
+    TopologyRegion right;
+};
+
 struct RoadEstimateLite {
     double line_error = 0.0;
     double far_error = 0.0;
@@ -255,6 +295,17 @@ struct RoadEstimateLite {
     int vision_color_filter_enabled = 0;
     ElementFlags elements;
     RoadImageInfo info;
+
+    // BOOM 连通域拓扑观测结果（--topology，默认关）。
+    TopologyReport topology;
+
+    // 归一化误差的物理厘米换算（--cm-error，默认关）。
+    bool cm_scale_valid = false;
+    double cm_per_col_control = 0.0;
+    double cm_per_col_far = 0.0;
+    double line_error_cm = 0.0;
+    double far_error_cm = 0.0;
+    double vehicle_center_error_cm = 0.0;
     std::array<int, kBinaryHeight> left{};
     std::array<int, kBinaryHeight> right{};
     std::array<int, kBinaryHeight> mid{};

@@ -385,7 +385,8 @@ int count_branch_segments(const std::array<int, kBinaryHeight>& side,
 
 }  // namespace
 
-LegacyVisionPipeline::LegacyVisionPipeline(const PathParams& params) : p_(params) {
+LegacyVisionPipeline::LegacyVisionPipeline(const PathParams& params)
+    : p_(params), topology_(params) {
     VisionTuningParams tuning;
     tuning.threshold_floor = params.threshold_floor;
     tuning.color_filter_enabled = params.vision_color_filter;
@@ -517,6 +518,137 @@ int LegacyVisionPipeline::row_for_distance(double distance_cm) const {
     return image_row_to_binary_row(points.back().image_row);
 }
 
+double LegacyVisionPipeline::distance_for_binary_row(int row) const {
+    if (calibration_.empty()) {
+        return 0.0;
+    }
+    // 与 row_for_distance() 互为反函数：网格行 -> 标定图像行 -> 距离(cm)。
+    const int calib_h = std::max(1, p_.calibration_image_height);
+    const double image_row = static_cast<double>(row) *
+        static_cast<double>(calib_h) / static_cast<double>(kBinaryHeight);
+    std::vector<CalibrationPoint> points = calibration_;
+    std::sort(points.begin(), points.end(), [](const auto& a, const auto& b) {
+        return a.image_row < b.image_row;
+    });
+    // 图像行越大 = 越靠车头 = 距离越小。
+    if (image_row >= points.back().image_row) {
+        return points.back().distance_cm;
+    }
+    if (image_row <= points.front().image_row) {
+        return points.front().distance_cm;
+    }
+    for (std::size_t i = 1; i < points.size(); ++i) {
+        const CalibrationPoint& far_point = points[i - 1];
+        const CalibrationPoint& near_point = points[i];
+        if (image_row <= near_point.image_row) {
+            const double denom =
+                std::max(1e-6, near_point.image_row - far_point.image_row);
+            const double t = (image_row - far_point.image_row) / denom;
+            return far_point.distance_cm +
+                (near_point.distance_cm - far_point.distance_cm) * t;
+        }
+    }
+    return points.back().distance_cm;
+}
+
+void LegacyVisionPipeline::update_cm_scale(RoadEstimateLite* out) {
+    out->cm_scale_valid = false;
+    out->cm_per_col_control = 0.0;
+    out->cm_per_col_far = 0.0;
+    out->line_error_cm = 0.0;
+    out->far_error_cm = 0.0;
+    out->vehicle_center_error_cm = 0.0;
+    if (!p_.cm_error_enable || !(p_.track_width_cm > 0.0)) {
+        return;
+    }
+
+    // 逐行横向比例 = 赛道物理宽度 / 该行双边实测列宽。
+    // 只在双边有效且宽度合理的行上成立，不需要任何额外的摄像头标定。
+    std::array<double, kBinaryHeight> scale{};
+    scale.fill(0.0);
+    const int top = out->info.top;
+    const int bottom = out->info.bottom - 1;
+    for (int y = top; y <= bottom; ++y) {
+        if (!out->left_valid[y] || !out->right_valid[y]) continue;
+        const int cols = out->width[y];
+        if (cols < 4) continue;
+        scale[y] = p_.track_width_cm / static_cast<double>(cols);
+    }
+
+    // 目标行没有有效双边时，取最近的有效行，并按"横向比例正比于距离"外推。
+    const auto scale_at = [&](int row, double* value) {
+        row = clamp_value(row, top, bottom);
+        if (scale[row] > 0.0) {
+            *value = scale[row];
+            return true;
+        }
+        int nearest = -1;
+        int best_gap = kBinaryHeight + 1;
+        for (int y = top; y <= bottom; ++y) {
+            if (scale[y] <= 0.0) continue;
+            const int gap = std::abs(y - row);
+            if (gap < best_gap) {
+                best_gap = gap;
+                nearest = y;
+            }
+        }
+        if (nearest < 0) {
+            return false;
+        }
+        const double row_distance = distance_for_binary_row(row);
+        const double nearest_distance = distance_for_binary_row(nearest);
+        if (row_distance > 0.0 && nearest_distance > 0.0) {
+            *value = scale[nearest] * row_distance / nearest_distance;
+        } else {
+            *value = scale[nearest];
+        }
+        return true;
+    };
+
+    const double half_width = (kBinaryWidth - 1) * 0.5;
+    double control_scale = 0.0;
+    double far_scale = 0.0;
+    const bool control_ok = scale_at(out->info.control_row, &control_scale);
+    const bool far_ok = scale_at(out->info.far_row, &far_scale);
+    if (!control_ok && !far_ok) {
+        return;
+    }
+    if (control_ok) {
+        out->cm_per_col_control = control_scale;
+        out->line_error_cm = out->line_error * half_width * control_scale;
+    }
+    if (far_ok) {
+        out->cm_per_col_far = far_scale;
+        out->far_error_cm = out->far_error * half_width * far_scale;
+    }
+    double anchor_scale = 0.0;
+    if (scale_at(out->info.vehicle_anchor_row, &anchor_scale)) {
+        out->vehicle_center_error_cm = out->vehicle_center_error *
+            half_width * anchor_scale;
+    }
+    out->cm_scale_valid = true;
+}
+
+void LegacyVisionPipeline::update_topology(RoadEstimateLite* out) {
+    if (!p_.enable_topology) {
+        return;
+    }
+    // 起点行与 find_longest_white_column() 保持一致：轮罩开启时取轮罩上沿之上。
+    int seed_row = out->info.bottom - 1;
+    if (p_.wheel_mask_enable) {
+        int left = 0;
+        int right = 0;
+        int top = 0;
+        int bottom = 0;
+        wheel_box(&left, &right, &top, &bottom);
+        seed_row = clamp_value(top - 1, out->info.top,
+                               out->info.bottom - 1);
+    }
+    out->topology = topology_.analyze(frame_.binary[0].data(),
+                                      kBinaryWidth, kBinaryHeight,
+                                      out->info.max_column, seed_row);
+}
+
 RoadEstimateLite LegacyVisionPipeline::process_gray(const std::uint8_t* gray,
                                                     int width,
                                                     int height,
@@ -541,6 +673,8 @@ RoadEstimateLite LegacyVisionPipeline::process_loaded_grid() {
     fit_missing_edges_from_bottom(&out);
     find_midline(&out);
     classify_geometry(&out);
+    update_cm_scale(&out);
+    update_topology(&out);
     out.vision_threshold = threshold;
     out.vision_blue_mask_pixels = last_blue_mask_pixels_;
     out.vision_color_filter_enabled = tuning.color_filter_enabled ? 1 : 0;
@@ -2057,6 +2191,8 @@ void LegacyVisionPipeline::find_midline(RoadEstimateLite* out) {
         calc_error_at_row(*out, out->info.control_row);
     out->far_error = calc_error_at_row(
         *out, clamp_value(far_row, out->info.top, out->info.bottom - 1));
+    out->info.far_row =
+        clamp_value(far_row, out->info.top, out->info.bottom - 1);
 
     int wheel_left = 0;
     int wheel_right = 0;
@@ -2068,6 +2204,7 @@ void LegacyVisionPipeline::find_midline(RoadEstimateLite* out) {
         wheel_top - 2,
         out->info.control_row,
         out->info.bottom - 1);
+    out->info.vehicle_anchor_row = vehicle_anchor_row;
     const double image_center = (kBinaryWidth - 1) * 0.5;
     const double vehicle_center =
         (wheel_left + wheel_right) * 0.5;

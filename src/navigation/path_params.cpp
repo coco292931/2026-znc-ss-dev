@@ -202,6 +202,15 @@ void PathParams::print_help(const char* exe) const {
         "  --branch-return <N>     Fit-line return tolerance px, default 3\n"
         "  --lock-slope-tol <N>    Unlock CROSS_LOCK if quantile slope drifts, default 0.35\n"
         "  --round-stable-tol <N>  Max mean search/prediction gap on stable side, default 2\n"
+        "  --topology              Publish BOOM-style connected-region topology (default off)\n"
+        "  --no-topology           Disable topology observation\n"
+        "  --topology-side-rows <N> Near rows scanned for side-region seeds, default 33\n"
+        "  --topology-min-area <N>  Minimum side-region area, default 8\n"
+        "  --topology-seed-rows <N> Seed row fallback steps, default 4\n"
+        "  --cm-error              Publish centimetre errors (needs --track-width-cm)\
+"
+        "  --no-cm-error           Disable centimetre errors\n"
+        "  --track-width-cm <N>    Measured physical track width, default 45\n"
         "  --no-far-search         Stop using horizon-wide far search\n"
         "  --no-rotate             Do not rotate camera frame 180 degrees\n"
         "  -h, --help              Show this help\n",
@@ -539,6 +548,22 @@ void PathParams::parse(int argc, char** argv) {
             read_double(lock_slope_tolerance, i);
         } else if (arg == "--round-stable-tol") {
             read_double(round_stable_tolerance, i);
+        } else if (arg == "--topology") {
+            enable_topology = true;
+        } else if (arg == "--no-topology") {
+            enable_topology = false;
+        } else if (arg == "--topology-side-rows") {
+            read_int(topology_side_rows, i);
+        } else if (arg == "--topology-min-area") {
+            read_int(topology_min_region_area, i);
+        } else if (arg == "--topology-seed-rows") {
+            read_int(topology_seed_search_rows, i);
+        } else if (arg == "--cm-error") {
+            cm_error_enable = true;
+        } else if (arg == "--no-cm-error") {
+            cm_error_enable = false;
+        } else if (arg == "--track-width-cm") {
+            read_double(track_width_cm, i);
         } else if (arg == "--no-far-search") {
             far_search_enable = false;
         } else if (arg == "--no-rotate") {
@@ -786,6 +811,13 @@ void PathParams::parse(int argc, char** argv) {
     if (branch_return_tolerance < 0.0) branch_return_tolerance = 0.0;
     if (lock_slope_tolerance < 0.0) lock_slope_tolerance = 0.0;
     if (round_stable_tolerance < 0.1) round_stable_tolerance = 0.1;
+    topology_side_rows = clamp_value(topology_side_rows, 1, kBinaryHeight);
+    if (topology_min_region_area < 1) topology_min_region_area = 1;
+    if (topology_seed_search_rows < 0) topology_seed_search_rows = 0;
+    if (topology_seed_search_rows > kBinaryHeight - 1) {
+        topology_seed_search_rows = kBinaryHeight - 1;
+    }
+    if (!(track_width_cm > 0.0)) track_width_cm = 0.0;
     wheel_box_center_ratio = std::max(0.0, std::min(1.0, wheel_box_center_ratio));
     wheel_box_width_ratio = std::max(0.02, std::min(0.90, wheel_box_width_ratio));
     wheel_box_top_ratio = std::max(0.0, std::min(1.0, wheel_box_top_ratio));
@@ -1046,6 +1078,13 @@ void PathParams::print_banner() const {
                 branch_return_tolerance,
                 lock_slope_tolerance,
                 round_stable_tolerance);
+    std::printf("  topology=%s side_rows=%d min_area=%d seed_rows=%d | cm_error=%s track_width=%.1fcm\n",
+                enable_topology ? "on" : "off",
+                topology_side_rows,
+                topology_min_region_area,
+                topology_seed_search_rows,
+                cm_error_enable ? "on" : "off",
+                track_width_cm);
 }
 
 }  // namespace rewrite_path

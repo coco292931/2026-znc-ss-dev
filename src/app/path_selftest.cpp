@@ -495,6 +495,150 @@ int main(int argc, char** argv) {
     }
 
     {
+        PathParams parsed;
+        char arg0[] = "rewrite_selftest";
+        char arg1[] = "--topology";
+        char arg2[] = "--topology-side-rows";
+        char arg3[] = "12";
+        char arg4[] = "--topology-min-area";
+        char arg5[] = "17";
+        char arg6[] = "--cm-error";
+        char arg7[] = "--track-width-cm";
+        char arg8[] = "52.5";
+        char* args[] = {arg0, arg1, arg2, arg3, arg4,
+                        arg5, arg6, arg7, arg8};
+        parsed.parse(static_cast<int>(sizeof(args) / sizeof(args[0])), args);
+        check(parsed.enable_topology &&
+                  parsed.topology_side_rows == 12 &&
+                  parsed.topology_min_region_area == 17 &&
+                  parsed.cm_error_enable &&
+                  near(parsed.track_width_cm, 52.5, 1e-9),
+              "topology and cm-error CLI parameters are configurable");
+    }
+
+    {
+        // 直道：图像左右边界列都是背景黑，不应出现任何侧向开口证据。
+        PathParams topo_params;
+        topo_params.enable_topology = true;
+        topo_params.wheel_mask_enable = false;
+        LegacyVisionPipeline topo_vision(topo_params);
+        auto image = make_track(188, 120, 60, 128, 74, 114);
+        RoadEstimateLite road =
+            topo_vision.process_gray(image.data(), 188, 120, 188);
+        check(road.topology.valid && road.topology.track_area > 0,
+              "topology flood fill finds the track region");
+        check(road.topology.track_far_row >= 0 &&
+                  road.topology.track_far_row <
+                      road.topology.track_near_row,
+              "topology reports the track vertical extent");
+        check(road.topology.left.border_white_rows == 0 &&
+                  road.topology.right.border_white_rows == 0,
+              "straight track shows no white at the image borders");
+        check(!road.topology.left.border_is_track &&
+                  road.topology.left.area == 0,
+              "straight track has no left-side region");
+    }
+
+    {
+        // 左侧一块与主赛道不相连的白色区域（被黑缝隔开的侧路 / 车库）。
+        PathParams topo_params;
+        topo_params.enable_topology = true;
+        topo_params.wheel_mask_enable = false;
+        LegacyVisionPipeline topo_vision(topo_params);
+        auto image = make_track(188, 120, 60, 128, 74, 114);
+        for (int y = 100; y < 120; ++y) {
+            for (int x = 0; x <= 40; ++x) {
+                image[y * 188 + x] = 220;
+            }
+        }
+        RoadEstimateLite road =
+            topo_vision.process_gray(image.data(), 188, 120, 188);
+        check(road.topology.left.border_white_rows >= 8 &&
+                  !road.topology.left.border_is_track,
+              "left border white outside the track reports an opening");
+        check(road.topology.left.area >= 100 &&
+                  road.topology.left.min_col == 0 &&
+                  road.topology.left.seed_count >= 1,
+              "left opening region reaches the image border");
+        check(road.topology.right.border_white_rows == 0 &&
+                  road.topology.right.area == 0,
+              "left-side opening does not light up the right side");
+    }
+
+    {
+        // 白色与主赛道相连并顶到左边界：标记 border_is_track 而非独立区域。
+        PathParams topo_params;
+        topo_params.enable_topology = true;
+        topo_params.wheel_mask_enable = false;
+        LegacyVisionPipeline topo_vision(topo_params);
+        auto image = make_track(188, 120, 60, 128, 74, 114);
+        for (int y = 100; y < 120; ++y) {
+            for (int x = 0; x < 70; ++x) {
+                image[y * 188 + x] = 220;
+            }
+        }
+        RoadEstimateLite road =
+            topo_vision.process_gray(image.data(), 188, 120, 188);
+        check(road.topology.left.border_white_rows > 0 &&
+                  road.topology.left.border_is_track,
+              "white reaching the border through the track is flagged");
+    }
+
+    {
+        // 边界上的小块反光：边界白度仍可见，但面积被门限滤掉。
+        PathParams topo_params;
+        topo_params.enable_topology = true;
+        topo_params.wheel_mask_enable = false;
+        topo_params.topology_min_region_area = 40;
+        LegacyVisionPipeline topo_vision(topo_params);
+        auto image = make_track(188, 120, 60, 128, 74, 114);
+        for (int y = 116; y < 118; ++y) {
+            for (int x = 0; x < 4; ++x) {
+                image[y * 188 + x] = 220;
+            }
+        }
+        RoadEstimateLite road =
+            topo_vision.process_gray(image.data(), 188, 120, 188);
+        check(road.topology.left.border_white_rows > 0 &&
+                  road.topology.left.area == 0,
+              "small border reflection is filtered by the area gate");
+    }
+
+    {
+        // cm 标定：逐行比例由"实测赛道宽度 / 该行双边列宽"得到，
+        // 透视下远处每列代表更多厘米。
+        PathParams cm_params;
+        cm_params.cm_error_enable = true;
+        cm_params.track_width_cm = 45.0;
+        cm_params.wheel_mask_enable = false;
+        LegacyVisionPipeline cm_vision(cm_params);
+        auto image = make_track(188, 120, 60, 128, 92, 96);
+        RoadEstimateLite road =
+            cm_vision.process_gray(image.data(), 188, 120, 188);
+        check(road.cm_scale_valid && road.cm_per_col_control > 0.0 &&
+                  road.cm_per_col_far > 0.0,
+              "centimetre scale is derived from the measured track width");
+        check(road.cm_per_col_far > road.cm_per_col_control,
+              "far row has more centimetres per column than near row");
+        check(std::abs(road.line_error_cm) < 5.0,
+              "centred synthetic track keeps the centimetre error small");
+    }
+
+    {
+        // 未开启开关时不得产生任何额外输出，保证零行为变更。
+        PathParams plain_params;
+        plain_params.wheel_mask_enable = false;
+        LegacyVisionPipeline plain_vision(plain_params);
+        auto image = make_track(188, 120, 60, 128, 74, 114);
+        RoadEstimateLite road =
+            plain_vision.process_gray(image.data(), 188, 120, 188);
+        check(!road.topology.valid && !road.cm_scale_valid &&
+                  road.topology.track_area == 0 &&
+                  road.line_error_cm == 0.0,
+              "topology and centimetre output stay disabled by default");
+    }
+
+    {
         auto image = make_track(188, 120, 60, 128, 74, 114);
         for (int y = 88; y < 120; ++y) {
             for (int x = 86; x <= 104; ++x) {
